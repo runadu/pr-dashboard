@@ -33,6 +33,12 @@ Primary user flow:
 3. Dashboard renders the PR list
 4. Pull Request detail renders comments, linked issues, and diff for a single PR
 
+Current product scope:
+
+- the app is centered on the PR dashboard and PR detail flow
+- there is no standalone Issues workspace anymore
+- linked issues are only shown inside PR detail as contextual preview data
+
 ## Runtime Requirements
 
 Expected env vars:
@@ -42,7 +48,24 @@ Expected env vars:
 - `NEXTAUTH_SECRET`
 - `NEXTAUTH_URL`
 
+Use `.env.example` as the local setup template.
+
 Without a valid GitHub token, the main entry pages redirect to `/signin?callbackUrl=...`.
+
+## Security Note
+
+This project currently uses a GitHub OAuth app with the classic `repo` scope.
+That scope is broader than the app's ideal least-privilege footprint, but it is
+the current tradeoff to support private-repo PR reads, linked issue reads, and
+comment posting in a single flow.
+
+Important implications:
+
+- do not expose the token through client-visible session data
+- keep GitHub API access server-side
+- note that the GitHub token is currently stored in the NextAuth JWT session token, not in a purely server-side token store
+- prefer GitHub App migration if tighter repository-scoped permissions become important
+- GitHub App migration is a future hardening path, not an active priority at the current project stage
 
 ## Commands
 
@@ -75,6 +98,7 @@ Without a valid GitHub token, the main entry pages redirect to `/signin?callback
 - `src/app/pr/[owner]/[repo]/pulls/[number]/page.tsx`
   - server-rendered Pull Request detail page
   - fetches PR list, changed files, and linked issues
+- there is no standalone `src/app/issues/*` workspace route in the repo anymore
 
 ### API Routes
 
@@ -90,7 +114,8 @@ Without a valid GitHub token, the main entry pages redirect to `/signin?callback
 
 - `src/lib/auth.ts`
   - NextAuth GitHub provider config
-  - stores GitHub access token in JWT and session
+  - stores the GitHub access token in the NextAuth JWT
+  - does not expose the token through client-visible session data
 - `src/lib/server-auth.ts`
   - shared helper for resolving server-side session and access token
   - used by App Router pages and route handlers instead of duplicating auth lookup logic
@@ -128,6 +153,7 @@ Use server-side fetching first. Use Redux for interactive client state after the
   - `Header` supports `full` and `minimal` variants
 - `src/components/pr/*`
   - PR cards, list, filter bar, status badge, linked issue panels
+  - linked issue preview UI now lives under `src/components/pr/*`, not `src/components/issue/*`
 - `src/components/diff/*`
   - diff presentation
 - `src/components/comment/comment-box.tsx`
@@ -161,7 +187,7 @@ Do not add a second global stylesheet.
 Current type usage is not fully consolidated:
 
 - `src/types/index.ts` is used by the live dashboard and GitHub helpers
-- `src/types/next-auth.d.ts` augments `Session` and `JWT` with `accessToken`
+- `src/types/next-auth.d.ts` augments `JWT` with `accessToken`
 
 When touching PR domain types, prefer keeping `src/types/index.ts` as the main source instead of splitting definitions again.
 

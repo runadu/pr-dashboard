@@ -19,7 +19,13 @@ export const authOptions: AuthOptions = {
       clientId: process.env.GITHUB_ID!,
       clientSecret: process.env.GITHUB_SECRET!,
       authorization: {
-        params: { scope: "repo" }, // 讀 private repo 的 PR/Issue 並留言的最小權限
+        // Security note:
+        // GitHub classic OAuth scopes are coarse-grained. This app needs to read
+        // private-repo Pull Requests / linked Issues and post comments, so it
+        // currently relies on the broad `repo` scope. Treat this as an accepted
+        // short-term tradeoff, keep token usage server-side only, and prefer a
+        // GitHub App migration long-term if least-privilege becomes a priority.
+        params: { scope: "repo" },
       },
     }),
   ],

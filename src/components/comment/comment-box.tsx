@@ -321,7 +321,7 @@ export function CommentBox({
                 type="button"
                 onClick={handleSubmit}
                 disabled={isSubmitting || !body.trim()}
-                className="inline-flex items-center justify-center rounded-md border border-border bg-accent px-4 py-2 text-sm font-medium text-[var(--accent-foreground)] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex items-center justify-center rounded-md border border-border bg-accent px-4 py-2 text-sm font-medium text-accent-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {isSubmitting ? "Submitting..." : submitLabel}
               </button>
