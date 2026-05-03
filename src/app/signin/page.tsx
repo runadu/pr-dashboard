@@ -79,12 +79,13 @@ export default async function SignInPage({ searchParams }: SignInPageProps) {
 
   return (
     <main className="min-h-dvh bg-background px-4 py-6 text-foreground sm:px-6 sm:py-8">
-      <div className="mx-auto w-full overflow-hidden border border-border bg-surface">
+      <div className="mx-auto flex min-h-[calc(100dvh-3rem)] w-full flex-col overflow-hidden border border-border bg-surface sm:min-h-[calc(100dvh-4rem)]">
         <Header variant="minimal" />
 
-        <section className="border-t border-border">
-          <div className="mx-auto w-full max-w-screen-2xl px-5 py-8 sm:px-8 lg:px-10 lg:py-10 xl:px-12 xl:py-12">
-            <div className="grid gap-10 lg:grid-cols-12 lg:items-stretch">
+        <section className="flex flex-1 border-t border-border">
+          <div className="mx-auto flex w-full max-w-screen-2xl px-5 py-8 sm:px-8 lg:px-10 lg:py-10 xl:px-12 xl:py-12">
+            <div className="grid w-full gap-10 lg:grid-cols-12 lg:items-stretch">
+              {/* content */}
               <div className="flex flex-col justify-center lg:col-span-7 lg:pr-8 xl:col-span-8 xl:pr-12">
                 <div className="inline-flex w-fit items-center gap-2 text-[11px] font-medium uppercase tracking-[0.16em] text-accent">
                   <GitPullRequest className="h-3.5 w-3.5" />
@@ -92,22 +93,28 @@ export default async function SignInPage({ searchParams }: SignInPageProps) {
                 </div>
 
                 <h1 className="mt-4 max-w-3xl text-3xl font-semibold tracking-tight text-foreground sm:text-[2.9rem] sm:leading-tight">
-                  在同一個工作區處理 PR 審查
+                  更方便的處理 Pull Request
                 </h1>
 
                 <p className="mt-4 max-w-2xl text-sm text-muted sm:text-base">
-                  連接 GitHub 後，你可以在儀表板集中查看 PR、Issue
-                  與審查狀態，減少在多個頁面之間切換。
+                  連接 GitHub 後，你可以在儀表板集中查看 PR 與相關 Issue
+                  的審查狀態，減少在多個頁面之間切換。
                 </p>
 
-                <div className="mt-8 max-w-2xl space-y-4">
-                  {signInNotes.map((item) => {
+                <div className="mt-8 grid max-w-2xl grid-cols-1 gap-x-6 sm:grid-cols-2">
+                  {signInNotes.map((item, index) => {
                     const Icon = item.icon;
+                    const isFirstRow = index < 2;
 
                     return (
                       <div
                         key={item.title}
-                        className="flex items-start gap-4 border-t border-border/70 pt-4 first:border-t-0 first:pt-0"
+                        className={[
+                          "flex items-start gap-4 pt-4",
+                          "sm:pt-4",
+                          isFirstRow ? "sm:border-t-0 sm:pt-0" : "",
+                          index === 0 ? "border-t-0 pt-0" : "",
+                        ].join(" ")}
                       >
                         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent-soft text-accent">
                           <Icon className="h-4 w-4" />
@@ -124,33 +131,23 @@ export default async function SignInPage({ searchParams }: SignInPageProps) {
               </div>
 
               <div className="lg:col-span-5 lg:flex xl:col-span-4">
-                <div className="w-full rounded-2xl border border-border bg-background p-5 sm:p-6 lg:ml-auto lg:flex lg:h-full lg:max-w-md lg:flex-col">
+                <div className="flex w-full flex-col rounded-2xl border border-border bg-background p-5 sm:p-6 lg:ml-auto lg:h-full lg:max-w-md">
                   <div>
                     <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-accent">
                       Sign In
                     </p>
-
                     <h2 className="mt-3 text-[1.8rem] font-semibold tracking-tight text-foreground">
                       使用 GitHub 登入
                     </h2>
-
-                    <p className="mt-2 text-sm text-muted">
-                      完成授權後即可進入工作區；若憑證失效，也可在這裡重新連接。
-                    </p>
+                    <p className="mt-2 text-sm text-muted">登入後即可進入 Pull Request 工作區</p>
                   </div>
-
-                  <div className="mt-6 space-y-4">
+                  <div className="mt-6 space-y-4 lg:mt-auto">
                     {errorMessage && (
                       <div className="border border-destructive/30 bg-destructive-soft px-4 py-3 text-sm text-foreground">
                         {errorMessage}
                       </div>
                     )}
-
                     <GithubSignInButton callbackUrl={callbackUrl} />
-                  </div>
-
-                  <div className="mt-6 border-t border-border pt-4 text-sm text-muted lg:mt-auto">
-                    登入後即可回到 PR 工作區，繼續目前操作。
                   </div>
                 </div>
               </div>

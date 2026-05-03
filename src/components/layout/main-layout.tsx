@@ -11,13 +11,19 @@ type MainLayoutProps = {
 
 const SIDEBAR_COLLAPSED_STORAGE_KEY = "pr-dashboard.sidebar-collapsed";
 const SIDEBAR_PREFERENCE_EVENT = "pr-dashboard:sidebar-preference-change";
+const DEFAULT_SIDEBAR_COLLAPSED = true;
 
 function readSidebarCollapsedPreference(): boolean {
   if (typeof window === "undefined") {
-    return true;
+    return DEFAULT_SIDEBAR_COLLAPSED;
   }
 
-  return window.localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY) === "true";
+  const storedPreference = window.localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY);
+  if (storedPreference === null) {
+    return DEFAULT_SIDEBAR_COLLAPSED;
+  }
+
+  return storedPreference === "true";
 }
 
 function subscribeToSidebarPreference(callback: () => void) {
@@ -45,7 +51,7 @@ function getSidebarPreferenceSnapshot(): boolean {
 }
 
 function getSidebarPreferenceServerSnapshot(): boolean {
-  return true;
+  return DEFAULT_SIDEBAR_COLLAPSED;
 }
 
 function setSidebarCollapsedPreference(collapsed: boolean) {
