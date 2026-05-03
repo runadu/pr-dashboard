@@ -60,59 +60,39 @@ export function Header({ user, variant = "full" }: HeaderProps) {
             </div>
           </div>
         ) : (
-          <div className="flex flex-col gap-5">
-            <div className="flex items-start justify-between gap-3">
-              <Link
-                className="flex min-w-0 flex-1 items-center gap-3 transition hover:text-accent"
-                href="/"
-              >
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-border bg-surface-strong text-accent sm:h-12 sm:w-12">
-                  <GitPullRequest className="h-5 w-5" />
-                </div>
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <Link
+              className="flex w-full min-w-0 items-center gap-3 transition hover:text-accent sm:flex-1"
+              href="/"
+            >
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-border bg-surface-strong text-accent sm:h-12 sm:w-12">
+                <GitPullRequest className="h-5 w-5" />
+              </div>
 
-                <div className="min-w-0">
-                  <p className="truncate text-base font-semibold tracking-tight text-foreground sm:text-lg">
-                    PR Dashboard
-                  </p>
-                  <p className="truncate text-sm text-muted">GitHub review workspace</p>
-                </div>
-              </Link>
+              <div className="min-w-0">
+                <p className="truncate text-base font-semibold tracking-tight text-foreground sm:text-lg">
+                  PR Dashboard
+                </p>
+                <p className="truncate text-sm text-muted">GitHub review workspace</p>
+              </div>
+            </Link>
 
-              {user ? (
-                <div className="flex shrink-0 items-start gap-2">
-                  <div className="flex items-center justify-end gap-2">
-                    <NotificationsMenu />
-                    <ThemeToggle />
-                  </div>
-
-                  <div className="min-w-0 max-w-[76px] sm:max-w-none">
-                    <UserMenu avatarUrl={user.avatarUrl} email={user.email} name={user.name} />
-                  </div>
-                </div>
-              ) : (
-                <div className="shrink-0">
+            {user ? (
+              <div className="flex w-full shrink-0 items-start gap-2 sm:w-auto">
+                <div className="flex items-center justify-end gap-2">
+                  <NotificationsMenu />
                   <ThemeToggle />
                 </div>
-              )}
-            </div>
 
-            <div className="flex flex-col lg:flex-row lg:justify-between gap-2">
-              <div className="text-sm text-muted-foreground">{fullDateText}</div>
-
-              <div className="flex gap-3 flex-row flex-wrap items-center text-sm text-muted-foreground">
-                <div className="inline-flex items-center gap-2">
-                  <TimeIcon className="h-4 w-4 shrink-0 text-accent" />
-                  <span>{timeText}</span>
-                </div>
-
-                <div className="inline-flex w-fit max-w-full items-center gap-2 rounded-xl bg-surface-strong">
-                  <BadgeCheck className="h-4 w-4 shrink-0 text-accent" />
-                  <span className="truncate text-sm text-muted-foreground">
-                    {greeting}，{user?.name ?? "使用者"}
-                  </span>
+                <div className="min-w-0 flex-1 sm:flex-none">
+                  <UserMenu avatarUrl={user.avatarUrl} email={user.email} name={user.name} />
                 </div>
               </div>
-            </div>
+            ) : (
+              <div className="w-full shrink-0 sm:w-auto">
+                <ThemeToggle />
+              </div>
+            )}
           </div>
         )}
       </div>

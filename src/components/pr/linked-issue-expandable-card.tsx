@@ -21,7 +21,7 @@ export function LinkedIssueExpandableCard({
       <button
         type="button"
         onClick={() => setExpanded((current) => !current)}
-        className="w-full px-4 py-4 transition-colors hover:bg-surface-strong"
+        className="w-full px-4 py-4 transition-colors hover:bg-surface-strong cursor-pointer"
       >
         <LinkedIssueCard expanded={expanded} issue={issue} />
       </button>

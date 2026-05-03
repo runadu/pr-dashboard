@@ -286,7 +286,7 @@ export function CommentBox({
 
             <div className="px-4 py-4">
               {isPreview ? (
-                <div className="prose prose-sm min-h-[180px] max-w-none rounded-md border border-border bg-card px-4 py-3 text-sm text-foreground">
+                <div className="min-h-[180px] max-w-none rounded-md bg-transparent px-4 py-3 text-sm text-foreground">
                   {body.trim() ? (
                     <ReactMarkdown rehypePlugins={[rehypeSanitize, rehypeHighlight]}>
                       {body}
@@ -302,7 +302,7 @@ export function CommentBox({
                   value={body}
                   onChange={(e) => setBody(e.target.value)}
                   placeholder={placeholder}
-                  className="min-h-[160px] w-full resize-y border-0 bg-transparent px-4 py-3 
+                  className="min-h-[180px] w-full resize-y rounded-md border border-border bg-card px-4 py-3 
                   text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-0"
                 />
               )}
