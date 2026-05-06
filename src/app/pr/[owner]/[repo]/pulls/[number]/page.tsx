@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ArrowLeft, FolderGit2, GitPullRequest, UserRound } from "lucide-react";
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { CommentBox } from "@/components/comment/comment-box";
 import { DiffViewer } from "@/components/diff/diff-viewer";
 import { Header } from "@/components/layout/header";
@@ -53,37 +53,7 @@ export default async function PrDetailPage({ params }: PrDetailPageProps) {
   );
 
   if (!pullRequest) {
-    return (
-      <div className="min-h-screen bg-background px-4 py-6 text-foreground sm:px-6 sm:py-8">
-        <div className="mx-auto overflow-hidden border border-border bg-surface divide-y divide-border">
-          <Header user={user} />
-
-          <MainLayout sessionExpiresAt={session.expires}>
-            <section className="rounded-2xl border border-dashed border-border bg-card px-6 py-10 text-center shadow-sm sm:px-8">
-              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-accent-soft text-accent">
-                <GitPullRequest className="h-5 w-5" />
-              </div>
-
-              <p className="mt-4 text-xl font-semibold tracking-tight text-foreground">
-                找不到這筆 Pull Request
-              </p>
-
-              <p className="mt-2 text-sm leading-6 text-muted">
-                這筆資料可能不存在、已被移除，或你目前沒有權限查看。
-              </p>
-
-              <Link
-                className="mt-6 inline-flex items-center gap-2 rounded-xl border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:border-accent/30 hover:bg-accent-soft hover:text-accent"
-                href="/dashboard"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                <span>回到儀表板</span>
-              </Link>
-            </section>
-          </MainLayout>
-        </div>
-      </div>
-    );
+    notFound();
   }
 
   return (
