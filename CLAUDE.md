@@ -2,42 +2,28 @@
 
 ## Critical Rule
 
-This repo is on `next@16.2.3`. Do not assume older Next.js behavior.
+This repo runs on `next@16.2.3`. Do not assume older Next.js behavior.
 
-Before changing any of the following, read the relevant docs under `node_modules/next/dist/docs/`:
-
-- App Router file conventions
-- Route Handlers
-- NextAuth integration points
-- Server vs Client Component boundaries
-- any new or deprecated Next APIs
-
-This is the same constraint noted in `AGENTS.md`, but repeated here because it is easy to miss and high-impact.
+Before changing App Router structure, Route Handlers, auth flow, or server/client boundaries, read the relevant docs under `node_modules/next/dist/docs/`.
 
 ## Project Summary
 
-This project is a GitHub Pull Request dashboard built with:
+This project is a GitHub PR triage workspace built with:
 
 - Next.js 16 App Router
 - React 19
 - TypeScript
 - Tailwind CSS 4
 - NextAuth with GitHub OAuth
-- Redux Toolkit for client-side list/filter state
-- `lucide-react` for icons
+- Redux Toolkit
+- `lucide-react`
 
-Primary user flow:
+Current scope:
 
-1. User signs in with GitHub
-2. Server components fetch Pull Request data using the GitHub access token
-3. Dashboard renders the PR list
-4. Pull Request detail renders comments, linked issues, and diff for a single PR
-
-Current product scope:
-
-- the app is centered on the PR dashboard and PR detail flow
-- there is no standalone Issues workspace anymore
-- linked issues are only shown inside PR detail as contextual preview data
+- cross-repo Pull Request triage dashboard
+- Pull Request detail page with linked issues, diff, and comments
+- no standalone Issues workspace
+- no checked-in mock dashboard data source
 
 ## Runtime Requirements
 
@@ -48,24 +34,38 @@ Expected env vars:
 - `NEXTAUTH_SECRET`
 - `NEXTAUTH_URL`
 
-Use `.env.example` as the local setup template.
+Without a valid GitHub session, protected pages redirect to `/signin?callbackUrl=...`.
 
-Without a valid GitHub token, the main entry pages redirect to `/signin?callbackUrl=...`.
+## Auth And Session Model
+
+- NextAuth uses JWT session strategy
+- GitHub access token is stored in the NextAuth JWT and used server-side only
+- client-visible session data must not expose the GitHub token
+- `/signin` is the single surface for auth-related UI messaging
+
+Current sign-in error states:
+
+- `AccessDenied`: GitHub OAuth was cancelled
+- `SessionRequired`: protected route was accessed without a usable session
+- `SessionExpired`: GitHub credentials are no longer valid
+- `SessionTimedOut`: client-side session timeout watcher forced sign-out
+
+Current session TTL in code is intentionally short for testing:
+
+- `AUTH_SESSION_EXPIRY_SECONDS = 60`
+
+Do not treat that value as a production default unless the requirement explicitly says so.
 
 ## Security Note
 
-This project currently uses a GitHub OAuth app with the classic `repo` scope.
-That scope is broader than the app's ideal least-privilege footprint, but it is
-the current tradeoff to support private-repo PR reads, linked issue reads, and
-comment posting in a single flow.
+This project currently uses a GitHub OAuth app with classic `repo` scope.
 
-Important implications:
+Implications:
 
-- do not expose the token through client-visible session data
 - keep GitHub API access server-side
-- note that the GitHub token is currently stored in the NextAuth JWT session token, not in a purely server-side token store
-- prefer GitHub App migration if tighter repository-scoped permissions become important
-- GitHub App migration is a future hardening path, not an active priority at the current project stage
+- do not expose the token through session serialization
+- this is broader than ideal least privilege
+- if tighter repo-scoped permission control becomes important, prefer a GitHub App migration
 
 ## Commands
 
@@ -81,148 +81,158 @@ Important implications:
 
 - `src/app/layout.tsx`
   - root layout
-  - injects the initial theme script with `next/script` before hydration
-  - wraps children with `ReduxProvider`
+  - injects initial theme script with `next/script`
+  - mounts providers
 - `src/app/page.tsx`
-  - auth gate
+  - top-level auth gate
   - redirects authenticated users to `/dashboard`
 - `src/app/signin/page.tsx`
-  - unauthenticated sign-in landing page
-  - uses the shared `Header` component in `minimal` mode
-  - supports `forceLogin=1` to bypass the normal signed-in redirect
-  - shows reauth messaging for `SessionExpired` and `SessionTimedOut`
-  - uses a GitHub-styled sign-in CTA instead of the generic accent button
+  - shared sign-in page
+  - renders auth error UI
+  - supports `forceLogin=1`
 - `src/app/dashboard/page.tsx`
-  - server-rendered dashboard page
-  - fetches live Pull Request data from GitHub
+  - server-rendered dashboard entry
+  - fetches live triage PR data
 - `src/app/pr/[owner]/[repo]/pulls/[number]/page.tsx`
-  - server-rendered Pull Request detail page
-  - fetches PR list, changed files, and linked issues
-- there is no standalone `src/app/issues/*` workspace route in the repo anymore
+  - server-rendered PR detail entry
+  - fetches PR detail, linked issues, diff, and comments context
 
 ### API Routes
 
 - `src/app/api/auth/[...nextauth]/route.ts`
   - NextAuth route handler
 - `src/app/api/comment/route.ts`
-  - reads and posts GitHub issue comments for a PR
-  - proxies `GET` and `POST` calls to the GitHub Issues Comments API
-  - validates that the requested target is visible in the app before proxying the request
-- there is no longer a checked-in `src/app/api/prs/*` route in the repo
+  - GitHub comment read/write proxy
+  - only for PR-visible targets
 
 ### Core Libraries
 
 - `src/lib/auth.ts`
-  - NextAuth GitHub provider config
-  - stores the GitHub access token in the NextAuth JWT
-  - does not expose the token through client-visible session data
+  - NextAuth config
+  - session TTL constants
+  - GitHub provider scope config
 - `src/lib/server-auth.ts`
-  - shared helper for resolving server-side session and access token
-  - used by App Router pages and route handlers instead of duplicating auth lookup logic
+  - resolves server session and access token
 - `src/lib/github-session.ts`
-  - builds reauth paths and redirects on GitHub auth/session failures
-- `src/lib/github-visibility.ts`
-  - determines whether a PR or Issue target is visible inside the app workspace
-  - used to gate comment API access
+  - auth-related signin path builders
+  - GitHub auth failure redirect helper
 - `src/lib/github.ts`
-  - shared GitHub API wrapper and fetch helpers
-  - preferred place for new GitHub integrations
-- `src/lib/theme.ts`
-  - shared theme constants and the initial inline theme script
+  - GitHub REST and GraphQL fetch helpers
+  - triage-oriented PR aggregation and normalization
 - `src/lib/triage.ts`
-  - triage queue labels, descriptions, options, and queue-count helpers
+  - triage labels, descriptions, options, and queue count helpers
+- `src/lib/theme.ts`
+  - theme helpers and bootstrap script
+- `src/lib/github-visibility.ts`
+  - visibility checks for comment API access
+
+### Types And Utilities
+
+- `src/types/index.ts`
+  - main PR domain types
+- `src/types/next-auth.d.ts`
+  - NextAuth JWT type augmentation for `accessToken`
+- `src/utils/time.ts`
+  - small date/time formatting helpers
+  - currently not part of the main dashboard flow
 
 ### State Management
 
 - `src/store/index.ts`
   - Redux store setup
-- `src/store/pr-slice.ts`
-  - PR list / selected PR / hasLoaded state
 - `src/store/filter-slice.ts`
-  - dashboard filtering and selectors
+  - dashboard queue/search filter state
+  - queue count derivation
+- `src/store/pr-slice.ts`
+  - PR list selection state
 - `src/store/hooks.ts`
   - typed Redux hooks
 
-Use server-side fetching first. Use Redux for interactive client state after the initial server payload is available.
-`MainLayout` also persists the sidebar collapsed preference in localStorage and mounts `SessionTimeoutWatcher`.
+Prefer server-side data fetching first. Use Redux for client-side interaction after initial payload hydration.
 
 ### Components
 
 - `src/components/layout/*`
-  - page shell, header, sidebar
-  - `Header` supports `full` and `minimal` variants
+  - header, sidebar, page shell
 - `src/components/pr/*`
-  - PR cards, list, filter bar, status badge, linked issue panels
-  - linked issue preview UI now lives under `src/components/pr/*`, not `src/components/issue/*`
-- `src/components/diff/*`
-  - diff presentation
+  - dashboard stats, filters, list, cards, linked issue panels
+- `src/components/diff/diff-viewer.tsx`
+  - client component
+  - wraps `react-diff-viewer-continued` directly
+  - do not reintroduce a thin client wrapper unless there is a concrete need
 - `src/components/comment/comment-box.tsx`
-  - comment thread + composer
+  - review thread and composer
+- `src/components/auth/session-timeout-watcher.tsx`
+  - forces sign-out when current session expires
 - `src/components/theme-toggle.tsx`
   - light/dark mode toggle
-- `src/components/auth/github-sign-in-button.tsx`
-  - client-side GitHub OAuth trigger button
-  - intentionally styled to resemble GitHub's sign-in button
-- `src/components/auth/session-timeout-watcher.tsx`
-  - signs the user out when the current session expires and redirects to reauth
-- `src/components/user-menu.tsx`
-  - header user menu
+- `src/components/notifications-menu.tsx`
+  - queue-oriented notification entry points
 
-### Styling
+## Triage Model
 
-- Global styles live in `src/styles/globals.css`
-- Theme tokens are defined as CSS variables there
-- Light/dark mode is driven by `html[data-theme="light|dark"]`
-- Use existing CSS tokens such as:
-  - `--background`
-  - `--foreground`
-  - `--surface`
-  - `--border`
-  - `--accent`
+Dashboard queue states:
 
-Do not add a second global stylesheet.
+- `needs-review`
+- `waiting-on-author`
+- `merge-blocked`
+- `ready-to-merge`
 
-## Type Sources
+Current PR intake is triage-oriented and cross-repo:
 
-Current type usage is not fully consolidated:
+- `author:{viewerLogin}`
+- `review-requested:{viewerLogin}`
 
-- `src/types/index.ts` is used by the live dashboard and GitHub helpers
-- `src/types/next-auth.d.ts` augments `JWT` with `accessToken`
+Results are deduped, sorted, then classified into the four queue states.
 
-When touching PR domain types, prefer keeping `src/types/index.ts` as the main source instead of splitting definitions again.
+When changing triage behavior:
 
-## Current Inconsistencies To Be Aware Of
+- update `src/lib/github.ts` classification rules
+- keep labels and descriptions in `src/lib/triage.ts` aligned
+- verify Dashboard stats, filter bar, sidebar, and notifications still match the same queue model
 
-This repo is functional but not fully cleaned up. Important examples:
+## Styling
 
-- `src/app/dashboard/page.tsx` uses live GitHub data
-- current dashboard flow hydrates Redux from server-fetched data
-- `src/.DS_Store` is present and should be treated as junk
+- global styles live in `src/styles/globals.css`
+- theme is driven by `html[data-theme="light|dark"]`
+- prefer Tailwind utility tokens backed by CSS variables
+- use semantic utilities like `bg-background`, `text-foreground`, `border-border`, `bg-surface`
+- keep UI compatible with both light and dark themes
 
-Do not create a third implementation of the same concern. Consolidate instead.
+Do not introduce a second global stylesheet.
+
+## UI And Copy
+
+- default copy should be Traditional Chinese
+- keep product/domain terms in English when clearer:
+  - Pull Request
+  - Dashboard
+  - Diff
+  - Session
+  - Queue
+- use `lucide-react` for UI icons
+- reuse shared `Header` and `Sidebar` patterns instead of forking variants
 
 ## Working Rules
 
-### Routing and Data Fetching
+### Routing And Data Fetching
 
-- Prefer Server Components for authenticated data reads
-- Use Route Handlers only when the browser must call the server directly
-- Keep auth checks close to the page or handler entrypoint
-- Prefer redirecting to `/signin?callbackUrl=...` for unauthenticated page access
-- Prefer `src/lib/server-auth.ts` when a page or route needs both the session object and the access token
-- Reauth/session-expiry redirects should go through `src/lib/github-session.ts` or `SessionTimeoutWatcher`, not ad hoc query-string construction
+- prefer Server Components for authenticated reads
+- use Route Handlers only when the browser needs direct server interaction
+- keep auth checks at page or handler entry
+- use `src/lib/server-auth.ts` when both session and access token are needed
+- build signin redirects through `src/lib/github-session.ts`, not ad hoc query string assembly
 
 ### GitHub API Integration
 
-- Reuse `src/lib/github.ts` instead of scattering raw `fetch("https://api.github.com/...")`
-- Keep GitHub headers consistent:
+- reuse `src/lib/github.ts`
+- keep GitHub headers consistent:
   - `Authorization: Bearer ...`
   - `Accept: application/vnd.github+json`
   - `X-GitHub-Api-Version: 2022-11-28`
-- Normalize GitHub responses into app-level types before handing data to UI components
-- If you touch auth/session error handling around GitHub requests, check `src/lib/github-session.ts` before adding redirect logic elsewhere
+- normalize GitHub responses into app-level types before handing them to UI
 
-### Client Components
+### Client Boundaries
 
 Only add `"use client"` when needed for:
 
@@ -231,60 +241,22 @@ Only add `"use client"` when needed for:
 - event handlers
 - browser APIs
 - Redux hooks
+- third-party browser-only components
 
-Keep the client boundary as small as practical.
+Keep client boundaries small, but not so fragmented that they become thin wrappers with no real value.
 
-### UI and Copy
+### Structure Discipline
 
-- Default UI copy should be Traditional Chinese
-- Keep domain/product terms in English when they are clearer or more conventional
-  - examples: Pull Request, Dashboard, Diff, Session
-- Reuse `lucide-react` icons for new UI icons
-- Keep the sign-in page visually aligned with the rest of the app:
-  - use the shared `Header` in `minimal` mode instead of forking a new header
-  - keep theme switching available before login
-  - do not restyle the GitHub sign-in button away from a GitHub-like affordance unless the requirement changes
+- do not reintroduce pass-through wrappers like the removed `Workspace`
+- do not add one-off thin client wrappers like the removed `DiffViewerClient` unless the boundary is genuinely necessary
+- remove dead hooks and commented-out integrations instead of preserving them as placeholders
+- consolidate duplicate logic instead of creating a third abstraction
 
-### Styling
+## Validation
 
-- Reuse existing CSS tokens and spacing patterns
-- Match the current glass/surface visual language
-- Prefer a single outer shell with divider lines over stacked adjacent borders when working on page layout
-- Keep components compatible with both light and dark theme
-- Do not hardcode dark-only colors unless there is no token that fits
+After meaningful changes, prefer:
 
-### State and Selectors
+1. `npm run lint`
+2. `npm run build`
 
-- Put shared filter logic in Redux selectors, not duplicated in components
-- Keep async data fetching logic out of presentational components where possible
-- If server data is already available, prefer passing it down over refetching on mount
-
-## Preferred Files For New Work
-
-Use these as the default insertion points:
-
-- new GitHub API helper: `src/lib/github.ts`
-- new app-level type: `src/types/index.ts` or a type consolidation change
-- new dashboard UI: `src/components/pr/*` or `src/components/layout/*`
-- new page route: `src/app/**/page.tsx`
-- new route handler: `src/app/api/**/route.ts`
-- new global token/style: `src/styles/globals.css`
-
-## Known Follow-Up Work
-
-These are reasonable cleanup targets if you touch adjacent areas:
-
-- consolidate duplicated PR list implementations
-- replace raw `<img>` usage in header/comment UIs with `next/image` where appropriate
-- align sidebar active state with query-string filters if query-based navigation remains
-
-## Definition of Done For Small Changes
-
-For typical code changes:
-
-1. update implementation
-2. keep App Router / Next 16 conventions valid
-3. run `npm run lint`
-4. avoid introducing another duplicate abstraction
-
-If a change affects auth, routing, or Next runtime behavior, verify the relevant Next 16 docs first.
+If `next build` fails inside sandbox because Turbopack needs capabilities the sandbox blocks, rerun it outside the sandbox rather than assuming the project is broken.

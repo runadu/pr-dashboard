@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { signOut } from "next-auth/react";
 import { usePathname, useSearchParams } from "next/navigation";
+import { buildTimedOutSignInPath } from "@/lib/github-session";
 
 type SessionTimeoutWatcherProps = {
   expiresAt: string;
@@ -10,7 +11,7 @@ type SessionTimeoutWatcherProps = {
 
 function buildTimeoutRedirectPath(pathname: string, search: string) {
   const callbackUrl = `${pathname}${search}`;
-  return `/signin?callbackUrl=${encodeURIComponent(callbackUrl)}&error=SessionTimedOut`;
+  return buildTimedOutSignInPath(callbackUrl);
 }
 
 export function SessionTimeoutWatcher({ expiresAt }: SessionTimeoutWatcherProps) {

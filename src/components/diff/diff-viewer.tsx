@@ -1,5 +1,7 @@
+"use client";
+
+import ReactDiffViewer, { DiffMethod } from "react-diff-viewer-continued";
 import type { PullRequestFile } from "@/types/index";
-import { DiffViewerClient } from "./diff-viewer-client";
 
 type DiffViewerProps = {
   files: PullRequestFile[];
@@ -118,10 +120,13 @@ export function DiffViewer({ files }: DiffViewerProps) {
               {file.patch ? (
                 <div className="max-w-full overflow-x-auto overscroll-x-contain bg-card">
                   <div className="min-w-0">
-                    <DiffViewerClient
-                      oldCode={oldCode}
-                      newCode={newCode}
-                      filename={file.filename}
+                    <ReactDiffViewer
+                      oldValue={oldCode}
+                      newValue={newCode}
+                      splitView={false}
+                      compareMethod={DiffMethod.LINES}
+                      leftTitle={file.filename}
+                      useDarkTheme={false}
                     />
                   </div>
                 </div>

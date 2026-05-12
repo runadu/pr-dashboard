@@ -5,7 +5,6 @@ import { GitPullRequest } from "lucide-react";
 import { NotificationsMenu } from "@/components/notifications-menu";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { UserMenu } from "@/components/user-menu";
-// import { useDateTime } from "@/hooks/use-date-time";
 
 type HeaderUser = {
   name: string;
@@ -20,16 +19,6 @@ type HeaderProps = {
 
 export function Header({ user, variant = "full" }: HeaderProps) {
   const isMinimal = variant === "minimal";
-  // const { now, isMorning, isAfternoon } = useDateTime();
-  // const greeting = isMorning ? "早安" : isAfternoon ? "午安" : "晚安";
-  // const fullDateText = now
-  //   ? new Intl.DateTimeFormat("en-US", {
-  //       weekday: "long",
-  //       month: "short",
-  //       day: "numeric",
-  //       year: "numeric",
-  //     }).format(now)
-  //   : "Loading date";
 
   return (
     <header className="relative z-20 overflow-visible bg-surface px-4 py-4 sm:px-6 sm:py-5">

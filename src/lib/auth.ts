@@ -6,6 +6,7 @@ export const AUTH_SESSION_EXPIRY_SECONDS = 8 * 60 * 60; // 8 hours
 export const authOptions: AuthOptions = {
   pages: {
     signIn: "/signin",
+    error: "/signin",
   },
   session: {
     strategy: "jwt",

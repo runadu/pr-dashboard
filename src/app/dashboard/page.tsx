@@ -1,9 +1,11 @@
 import { redirect } from "next/navigation";
 import { Header } from "@/components/layout/header";
 import { MainLayout } from "@/components/layout/main-layout";
-import { Workspace } from "@/components/pr/workspace";
+import { DashboardStats } from "@/components/pr/dashboard-stats";
+import { FilterBar } from "@/components/pr/filter-bar";
+import { List } from "@/components/pr/list";
 import { getPullRequests } from "@/lib/github";
-import { redirectOnGitHubAuthError } from "@/lib/github-session";
+import { buildSessionRequiredSignInPath, redirectOnGitHubAuthError } from "@/lib/github-session";
 import { getServerAuth } from "@/lib/server-auth";
 import { getPullRequestQueueCounts } from "@/lib/triage";
 
@@ -11,7 +13,7 @@ export default async function DashboardPage() {
   const { session, accessToken } = await getServerAuth();
 
   if (!session || !accessToken) {
-    redirect("/signin?callbackUrl=%2Fdashboard");
+    redirect(buildSessionRequiredSignInPath("/dashboard"));
   }
 
   let prs;
@@ -37,7 +39,11 @@ export default async function DashboardPage() {
         <Header user={user} />
 
         <MainLayout sessionExpiresAt={session.expires}>
-          <Workspace initialPRs={prs} initialQueueCounts={initialQueueCounts} />
+          <div className="flex flex-col gap-3">
+            <DashboardStats initialQueueCounts={initialQueueCounts} />
+            <FilterBar />
+            <List initialPRs={prs} />
+          </div>
         </MainLayout>
       </div>
     </div>

@@ -8,7 +8,7 @@ import { MainLayout } from "@/components/layout/main-layout";
 import { LinkedIssuesPanel } from "@/components/pr/linked-issues-panel";
 import { StatusBadge } from "@/components/pr/badge";
 import { getPullRequestFiles, getPullRequestLinkedIssues, getPullRequests } from "@/lib/github";
-import { redirectOnGitHubAuthError } from "@/lib/github-session";
+import { buildSessionRequiredSignInPath, redirectOnGitHubAuthError } from "@/lib/github-session";
 import { getServerAuth } from "@/lib/server-auth";
 
 type PrDetailPageProps = {
@@ -22,9 +22,10 @@ type PrDetailPageProps = {
 export default async function PrDetailPage({ params }: PrDetailPageProps) {
   const { owner, repo, number } = await params;
   const { session, accessToken } = await getServerAuth();
+  const callbackUrl = `/pr/${owner}/${repo}/pulls/${number}`;
 
   if (!session || !accessToken) {
-    redirect(`/signin?callbackUrl=${encodeURIComponent(`/pr/${owner}/${repo}/pulls/${number}`)}`);
+    redirect(buildSessionRequiredSignInPath(callbackUrl));
   }
 
   let prs;
@@ -38,7 +39,7 @@ export default async function PrDetailPage({ params }: PrDetailPageProps) {
       getPullRequestLinkedIssues(accessToken, owner, repo, Number(number)),
     ]);
   } catch (error) {
-    redirectOnGitHubAuthError(error, `/pr/${owner}/${repo}/pulls/${number}`);
+    redirectOnGitHubAuthError(error, callbackUrl);
     throw error;
   }
 

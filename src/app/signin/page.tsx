@@ -29,6 +29,8 @@ function getErrorMessage(error?: string | string[]): string | null {
   switch (value) {
     case "AccessDenied":
       return "GitHub 授權被取消，請重新登入。";
+    case "SessionRequired":
+      return "請重新登入以繼續。";
     case "SessionExpired":
       return "GitHub 憑證已失效，請重新連接 GitHub。";
     case "SessionTimedOut":
@@ -73,7 +75,7 @@ export default async function SignInPage({ searchParams }: SignInPageProps) {
   const forceLogin =
     (Array.isArray(query.forceLogin) ? query.forceLogin[0] : query.forceLogin) === "1";
 
-  if (session && accessToken && !forceLogin) {
+  if (session && accessToken && !forceLogin && !errorMessage) {
     redirect(callbackUrl);
   }
 
@@ -143,7 +145,7 @@ export default async function SignInPage({ searchParams }: SignInPageProps) {
                   </div>
                   <div className="mt-6 space-y-4 lg:mt-auto">
                     {errorMessage && (
-                      <div className="border border-destructive/30 bg-destructive-soft px-4 py-3 text-sm text-foreground">
+                      <div className="border border-destructive/30 rounded-xl bg-destructive-soft px-4 py-3 text-sm text-foreground">
                         {errorMessage}
                       </div>
                     )}
