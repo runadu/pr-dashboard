@@ -34,7 +34,7 @@ export default async function DashboardPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground px-4 py-6 sm:px-6 sm:py-8">
+    <div className="min-h-screen bg-background text-foreground">
       <div className="mx-auto overflow-hidden border border-border bg-surface divide-y divide-border">
         <Header user={user} />
 
