@@ -32,7 +32,7 @@ export async function isAppVisibleTarget(token: string, target: GitHubTargetRef)
 
   const visibleTargetKeys = new Set<string>();
 
-  linkedIssueGroups.flat().forEach((issue) => {
+  linkedIssueGroups.flatMap((group) => group.issues).forEach((issue) => {
     visibleTargetKeys.add(toTargetKey(issue));
   });
 

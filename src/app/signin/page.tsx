@@ -80,7 +80,7 @@ export default async function SignInPage({ searchParams }: SignInPageProps) {
   }
 
   return (
-    <main className="min-h-dvh bg-background px-4 py-6 text-foreground sm:px-6 sm:py-8">
+    <main className="min-h-dvh bg-background text-foreground">
       <div className="mx-auto flex min-h-[calc(100dvh-3rem)] w-full flex-col overflow-hidden border border-border bg-surface sm:min-h-[calc(100dvh-4rem)]">
         <Header variant="minimal" />
 

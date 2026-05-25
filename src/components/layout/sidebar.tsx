@@ -124,7 +124,7 @@ export function Sidebar({
 
   return (
     <aside
-      className={["relative bg-surface", collapsed ? "p-3 lg:px-2 lg:py-3" : "p-4 lg:p-5"].join(
+      className={["relative bg-surface", collapsed ? "p-3 lg:px-2 lg:py-3" : "p-4 lg:py-3"].join(
         " "
       )}
     >

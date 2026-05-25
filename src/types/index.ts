@@ -1,11 +1,24 @@
 export type PullRequestStatus = "open" | "closed" | "merged";
+export type PullRequestReviewDecision =
+  | "approved"
+  | "changes_requested"
+  | "review_required"
+  | "commented"
+  | "none";
+export type PullRequestCheckState = "passing" | "failing" | "pending" | "unavailable";
 export type PullRequestTriageQueue =
   | "needs-review"
   | "waiting-on-author"
   | "merge-blocked"
   | "ready-to-merge";
 export type PullRequestTriageFilter = "all" | PullRequestTriageQueue;
-export type PullRequestFileStatus = "added" | "removed" | "modified";
+export type PullRequestFileStatus = "added" | "removed" | "modified" | "renamed";
+export type PullRequestFileContentMode =
+  | "full"
+  | "patch"
+  | "binary"
+  | "oversized"
+  | "unavailable";
 export type IssueStatus = "open" | "closed";
 
 export interface GitHubRepositoryRef {
@@ -23,6 +36,14 @@ export interface GitHubIssueLabel {
   color: string;
 }
 
+export interface PullRequestCheckSummary {
+  state: PullRequestCheckState;
+  totalCount: number;
+  passingCount: number;
+  failingCount: number;
+  pendingCount: number;
+}
+
 export interface PullRequest extends GitHubRepositoryRef {
   id: number;
   number: number;
@@ -37,14 +58,22 @@ export interface PullRequest extends GitHubRepositoryRef {
   triageReason: string;
   isDraft: boolean;
   mergeableState: string | null;
+  htmlUrl: string;
+  reviewDecision?: PullRequestReviewDecision;
+  pendingReviewers?: string[];
+  checkSummary?: PullRequestCheckSummary;
 }
 
 export interface PullRequestFile {
   filename: string;
+  previousFilename?: string | null;
   additions: number;
   deletions: number;
   patch: string;
   status: PullRequestFileStatus;
+  oldCode: string | null;
+  newCode: string | null;
+  contentMode: PullRequestFileContentMode;
 }
 
 export interface GitHubIssueDetail extends GitHubRepositoryRef {
@@ -67,4 +96,9 @@ export type GitHubIssuePreview = GitHubIssueDetail;
 
 export interface PullRequestLinkedIssue extends GitHubIssueDetail {
   labels: GitHubIssueLabel[];
+}
+
+export interface PullRequestLinkedIssuesResult {
+  issues: PullRequestLinkedIssue[];
+  error: string | null;
 }

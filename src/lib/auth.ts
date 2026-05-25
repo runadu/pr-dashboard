@@ -1,5 +1,5 @@
 import { AuthOptions } from "next-auth";
-import GithubProvider from "next-auth/providers/github";
+import { GitHubAppProvider } from "@/lib/github-app-provider";
 
 export const AUTH_SESSION_EXPIRY_SECONDS = 8 * 60 * 60; // 8 hours
 
@@ -16,23 +16,16 @@ export const authOptions: AuthOptions = {
     maxAge: AUTH_SESSION_EXPIRY_SECONDS,
   },
   providers: [
-    GithubProvider({
-      clientId: process.env.GITHUB_ID!,
-      clientSecret: process.env.GITHUB_SECRET!,
-      authorization: {
-        // Security note:
-        // GitHub classic OAuth scopes are coarse-grained. This app needs to read
-        // private-repo Pull Requests / linked Issues and post comments, so it
-        // currently relies on the broad `repo` scope. Treat this as an accepted
-        // short-term tradeoff, keep token usage server-side only, and prefer a
-        // GitHub App migration long-term if least-privilege becomes a priority.
-        params: { scope: "repo" },
-      },
+    GitHubAppProvider({
+      clientId: process.env.GITHUB_APP_CLIENT_ID!,
+      clientSecret: process.env.GITHUB_APP_CLIENT_SECRET!,
     }),
   ],
   callbacks: {
     async jwt({ token, account }) {
-      // 第一次登入時 account 有值，把 access_token 存進 JWT
+      // GitHub App user access token expires after 8 hours by default.
+      // Keep the NextAuth JWT lifetime aligned so the user is forced
+      // through a fresh authorization flow before the token goes stale.
       if (account?.access_token) token.accessToken = account.access_token;
       return token;
     },

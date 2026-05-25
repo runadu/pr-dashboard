@@ -14,14 +14,14 @@ This project is a GitHub PR triage workspace built with:
 - React 19
 - TypeScript
 - Tailwind CSS 4
-- NextAuth with GitHub OAuth
+- NextAuth with GitHub App user authorization
 - Redux Toolkit
 - `lucide-react`
 
 Current scope:
 
 - cross-repo Pull Request triage dashboard
-- Pull Request detail page with linked issues, diff, and comments
+- Pull Request detail page with linked issues, diff, and read-only comments
 - no standalone Issues workspace
 - no checked-in mock dashboard data source
 
@@ -29,8 +29,8 @@ Current scope:
 
 Expected env vars:
 
-- `GITHUB_ID`
-- `GITHUB_SECRET`
+- `GITHUB_APP_CLIENT_ID`
+- `GITHUB_APP_CLIENT_SECRET`
 - `NEXTAUTH_SECRET`
 - `NEXTAUTH_URL`
 
@@ -45,32 +45,34 @@ Without a valid GitHub session, protected pages redirect to `/signin?callbackUrl
 
 Current sign-in error states:
 
-- `AccessDenied`: GitHub OAuth was cancelled
+- `AccessDenied`: GitHub authorization was cancelled
 - `SessionRequired`: protected route was accessed without a usable session
 - `SessionExpired`: GitHub credentials are no longer valid
 - `SessionTimedOut`: client-side session timeout watcher forced sign-out
 
-Current session TTL in code is intentionally short for testing:
+Current session TTL in code is aligned with the GitHub App user token lifetime:
 
-- `AUTH_SESSION_EXPIRY_SECONDS = 60`
+- `AUTH_SESSION_EXPIRY_SECONDS = 8 * 60 * 60`
 
-Do not treat that value as a production default unless the requirement explicitly says so.
+Do not change that value casually without checking GitHub App token lifetime assumptions.
 
 ## Security Note
 
-This project currently uses a GitHub OAuth app with classic `repo` scope.
+This project currently uses a GitHub App user access token flow.
 
 Implications:
 
 - keep GitHub API access server-side
 - do not expose the token through session serialization
-- this is broader than ideal least privilege
-- if tighter repo-scoped permission control becomes important, prefer a GitHub App migration
+- app access is constrained by both repository installation and app permissions
+- current session lifetime is intentionally aligned with the default 8-hour GitHub App user token lifetime
 
 ## Commands
 
 - `npm run dev`
 - `npm run lint`
+- `npm run test`
+- `npm run test:diff`
 - `npm run build`
 
 `npm run lint` is the minimum validation step after code changes.
@@ -95,14 +97,15 @@ Implications:
   - fetches live triage PR data
 - `src/app/pr/[owner]/[repo]/pulls/[number]/page.tsx`
   - server-rendered PR detail entry
-  - fetches PR detail, linked issues, diff, and comments context
+  - fetches PR detail, linked issues, diff, and read-only comments context
 
 ### API Routes
 
 - `src/app/api/auth/[...nextauth]/route.ts`
   - NextAuth route handler
 - `src/app/api/comment/route.ts`
-  - GitHub comment read/write proxy
+  - GitHub comment read proxy
+  - `POST` is intentionally disabled and returns `405`
   - only for PR-visible targets
 
 ### Core Libraries
@@ -110,7 +113,10 @@ Implications:
 - `src/lib/auth.ts`
   - NextAuth config
   - session TTL constants
-  - GitHub provider scope config
+  - GitHub App provider config
+- `src/lib/github-app-provider.ts`
+  - custom GitHub App user-authorization provider
+  - fetches primary email when GitHub `/user` does not return one
 - `src/lib/server-auth.ts`
   - resolves server session and access token
 - `src/lib/github-session.ts`
@@ -119,6 +125,7 @@ Implications:
 - `src/lib/github.ts`
   - GitHub REST and GraphQL fetch helpers
   - triage-oriented PR aggregation and normalization
+  - PR file diff preparation with `full | patch | binary | oversized | unavailable` content modes
 - `src/lib/triage.ts`
   - triage labels, descriptions, options, and queue count helpers
 - `src/lib/theme.ts`
@@ -158,10 +165,17 @@ Prefer server-side data fetching first. Use Redux for client-side interaction af
   - dashboard stats, filters, list, cards, linked issue panels
 - `src/components/diff/diff-viewer.tsx`
   - client component
+  - per-file collapse/expand UI
   - wraps `react-diff-viewer-continued` directly
+  - renders full-content diffs when possible and explicit fallback states otherwise
   - do not reintroduce a thin client wrapper unless there is a concrete need
+- `src/components/diff/diff-viewer-logic.ts`
+  - pure diff rendering decisions and fallback messaging
+- `src/components/diff/diff-viewer-logic.test.ts`
+  - Vitest coverage for diff render modes and rename summaries
 - `src/components/comment/comment-box.tsx`
-  - review thread and composer
+  - review thread display
+  - composer is intentionally disabled for now
 - `src/components/auth/session-timeout-watcher.tsx`
   - forces sign-out when current session expires
 - `src/components/theme-toggle.tsx`
@@ -231,6 +245,9 @@ Do not introduce a second global stylesheet.
   - `Accept: application/vnd.github+json`
   - `X-GitHub-Api-Version: 2022-11-28`
 - normalize GitHub responses into app-level types before handing them to UI
+- prefer full-content diff rendering when available, but keep patch-only and unavailable states explicit
+- comments are currently read-only
+- if write support returns later, re-enable it deliberately across UI, route handler, permissions, and docs together
 
 ### Client Boundaries
 
@@ -249,7 +266,8 @@ Keep client boundaries small, but not so fragmented that they become thin wrappe
 
 - do not reintroduce pass-through wrappers like the removed `Workspace`
 - do not add one-off thin client wrappers like the removed `DiffViewerClient` unless the boundary is genuinely necessary
-- remove dead hooks and commented-out integrations instead of preserving them as placeholders
+- remove dead hooks and stale commented-out code by default
+- short restoration notes are acceptable when a feature is intentionally paused and likely to return soon
 - consolidate duplicate logic instead of creating a third abstraction
 
 ## Validation
@@ -257,6 +275,7 @@ Keep client boundaries small, but not so fragmented that they become thin wrappe
 After meaningful changes, prefer:
 
 1. `npm run lint`
-2. `npm run build`
+2. `npm run test:diff`
+3. `npm run build`
 
 If `next build` fails inside sandbox because Turbopack needs capabilities the sandbox blocks, rerun it outside the sandbox rather than assuming the project is broken.

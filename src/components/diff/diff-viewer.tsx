@@ -1,5 +1,7 @@
 "use client";
 
+import { ChevronDown, ChevronRight } from "lucide-react";
+import { useState } from "react";
 import ReactDiffViewer, { DiffMethod } from "react-diff-viewer-continued";
 import type { PullRequestFile } from "@/types/index";
 
@@ -32,21 +34,53 @@ function parsePatch(patch: string): { oldCode: string; newCode: string } {
 }
 
 function fileStatusLabel(status: PullRequestFile["status"]) {
-  return status === "added" ? "新增" : status === "removed" ? "刪除" : "修改";
+  if (status === "added") return "新增";
+  if (status === "removed") return "刪除";
+  if (status === "renamed") return "更名";
+  return "修改";
 }
 
 function fileStatusClasses(status: PullRequestFile["status"]) {
   return status === "added"
-    ? "bg-success-soft text-success"
+    ? "border-success/30 bg-success-soft text-success"
     : status === "removed"
-      ? "bg-destructive-soft text-destructive"
-      : "bg-accent-soft text-accent";
+      ? "border-destructive/20 bg-destructive-soft text-destructive"
+      : "border-accent/30 bg-accent-soft text-accent";
 }
 
 export function DiffViewer({ files }: DiffViewerProps) {
+  const [collapsedFiles, setCollapsedFiles] = useState<Record<string, boolean>>({});
+  const allExpanded = files.every((file) => collapsedFiles[file.filename] === false);
+
+  function toggleFile(filename: string) {
+    setCollapsedFiles((current) => ({
+      ...current,
+      [filename]: !(current[filename] ?? true),
+    }));
+  }
+
+  function expandAll() {
+    setCollapsedFiles(
+      Object.fromEntries(files.map((file) => [file.filename, false])) as Record<string, boolean>
+    );
+  }
+
+  function collapseAll() {
+    setCollapsedFiles(
+      Object.fromEntries(files.map((file) => [file.filename, true])) as Record<string, boolean>
+    );
+  }
+
+  function unavailableMessage(file: PullRequestFile) {
+    if (file.contentMode === "binary") return "Binary file 無法顯示文字 diff。";
+    if (file.contentMode === "oversized") return "檔案過大，已略過 diff 預覽。";
+    if (file.contentMode === "unavailable") return "GitHub 未提供此檔案的可顯示內容。";
+    return "無法顯示此檔案的 diff。";
+  }
+
   if (files.length === 0) {
     return (
-      <section className="rounded-2xl border border-border bg-card p-4 sm:p-5">
+      <section className="rounded-xl border border-border bg-card p-4 sm:p-5">
         <div className="flex flex-col gap-1">
           <p className="text-xs font-medium uppercase tracking-[0.22em] text-accent">程式碼變更</p>
           <h2 className="text-lg font-semibold tracking-tight text-foreground sm:text-xl">
@@ -54,7 +88,7 @@ export function DiffViewer({ files }: DiffViewerProps) {
           </h2>
         </div>
 
-        <div className="mt-4 rounded-2xl border border-dashed border-border bg-background px-4 py-6 text-sm text-muted">
+        <div className="mt-4 rounded-xl border border-dashed border-border bg-background px-4 py-6 text-sm text-muted">
           這個 PR 沒有檔案變更。
         </div>
       </section>
@@ -62,36 +96,70 @@ export function DiffViewer({ files }: DiffViewerProps) {
   }
 
   return (
-    <section className="rounded-2xl border border-border bg-card p-3 sm:p-4">
+    <section className="rounded-xl border border-border bg-card p-3 sm:p-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0 space-y-1">
-          <p className="text-xs font-medium uppercase tracking-[0.22em] text-accent">程式碼變更</p>
+          <p className="text-xs font-medium uppercase tracking-[0.22em] text-accent">
+            Code Changes
+          </p>
           <h2 className="text-lg font-semibold tracking-tight text-foreground sm:text-xl">
             Diff 檢視區
           </h2>
-          <p className="text-sm leading-6 text-muted">檢查每個檔案的變更內容與增減行數。</p>
         </div>
 
-        <div className="text-sm font-medium text-muted-foreground">
-          <span>{files.length}</span>
-          <span className="ml-2">個檔案</span>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="text-sm font-medium text-muted-foreground">
+            <span>{files.length}</span>
+            <span className="ml-2">個檔案</span>
+          </div>
+          <button
+            type="button"
+            onClick={allExpanded ? collapseAll : expandAll}
+            className="inline-flex items-center rounded-md border border-border bg-background px-2.5 py-1.5 text-xs font-medium text-foreground transition hover:border-accent/30 hover:text-accent"
+          >
+            {allExpanded ? "全部收合" : "全部展開"}
+          </button>
         </div>
       </div>
 
       <div className="mt-4 space-y-3 sm:mt-5 sm:space-y-4">
         {files.map((file) => {
-          const { oldCode, newCode } = parsePatch(file.patch ?? "");
+          const fallback = parsePatch(file.patch ?? "");
+          const oldCode = file.oldCode ?? fallback.oldCode;
+          const newCode = file.newCode ?? fallback.newCode;
+          const isCollapsed = collapsedFiles[file.filename] ?? true;
+          const canRenderDiff =
+            (file.contentMode === "full" || file.contentMode === "patch") &&
+            (Boolean(oldCode) || Boolean(newCode) || Boolean(file.patch));
 
           return (
             <article
               key={file.filename}
-              className="min-w-0 overflow-hidden rounded-2xl border border-border bg-background"
+              className="min-w-0 overflow-hidden rounded-xl border border-border bg-background"
             >
-              <header className="flex flex-col gap-3 border-b border-border bg-surface px-3 py-3 sm:px-4">
-                <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="flex min-w-0 items-start gap-2.5 sm:gap-3">
+              <header
+                className={[
+                  isCollapsed ? "" : "border-b border-border",
+                  "flex flex-col gap-3 bg-surface px-3 py-3 sm:px-4",
+                ].join(" ")}
+              >
+                <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex min-w-0 items-center gap-2.5 sm:gap-3">
+                    <button
+                      type="button"
+                      onClick={() => toggleFile(file.filename)}
+                      aria-expanded={!isCollapsed}
+                      aria-label={isCollapsed ? `展開 ${file.filename}` : `收合 ${file.filename}`}
+                      className="inline-flex items-center gap-1.5 rounded-sm border border-border bg-background p-1.5 text-xs font-semibold text-foreground transition hover:bg-surface hover:cursor-pointer"
+                    >
+                      {isCollapsed ? (
+                        <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
+                      ) : (
+                        <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />
+                      )}
+                    </button>
                     <span
-                      className={`inline-flex shrink-0 items-center rounded-full px-2.5 py-1 text-[11px] font-semibold ${fileStatusClasses(file.status)}`}
+                      className={`inline-flex shrink-0 items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${fileStatusClasses(file.status)}`}
                     >
                       {fileStatusLabel(file.status)}
                     </span>
@@ -117,7 +185,7 @@ export function DiffViewer({ files }: DiffViewerProps) {
                 </div>
               </header>
 
-              {file.patch ? (
+              {isCollapsed ? null : canRenderDiff ? (
                 <div className="max-w-full overflow-x-auto overscroll-x-contain bg-card">
                   <div className="min-w-0">
                     <ReactDiffViewer
@@ -125,13 +193,14 @@ export function DiffViewer({ files }: DiffViewerProps) {
                       newValue={newCode}
                       splitView={false}
                       compareMethod={DiffMethod.LINES}
-                      leftTitle={file.filename}
+                      showDiffOnly={true}
+                      hideSummary={true}
                       useDarkTheme={false}
                     />
                   </div>
                 </div>
               ) : (
-                <div className="px-4 py-4 text-sm text-muted">無法顯示此檔案的 diff。</div>
+                <div className="px-4 py-4 text-sm text-muted">{unavailableMessage(file)}</div>
               )}
             </article>
           );

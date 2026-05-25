@@ -1,11 +1,13 @@
 import type {
   IssueStatus,
   PullRequest,
+  PullRequestCheckSummary,
   PullRequestFile,
-  PullRequestLinkedIssue,
+  PullRequestLinkedIssuesResult,
 } from "@/types";
 
 const GITHUB_API = "https://api.github.com";
+const MAX_DIFF_RENDER_FILE_BYTES = 250_000;
 
 // 處理 GitHub token 失效
 export class GitHubAuthError extends Error {
@@ -98,6 +100,93 @@ function buildIssueSearchPath(query: string, perPage = 40) {
   return `/search/issues?q=${encodeURIComponent(query)}&sort=updated&order=desc&per_page=${perPage}`;
 }
 
+async function getRepositoryFileContent(
+  token: string,
+  owner: string,
+  repo: string,
+  path: string,
+  ref: string
+): Promise<
+  | { kind: "text"; content: string }
+  | { kind: "missing" }
+  | { kind: "binary" }
+  | { kind: "oversized" }
+  | { kind: "unavailable" }
+> {
+  const res = await fetch(
+    `${GITHUB_API}/repos/${owner}/${repo}/contents/${path.split("/").map(encodeURIComponent).join("/")}?ref=${encodeURIComponent(ref)}`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+      },
+    }
+  );
+
+  if (res.status === 404) {
+    return { kind: "missing" };
+  }
+
+  if (!res.ok) {
+    if (res.status === 401) {
+      throw new GitHubAuthError(`GitHub API error: ${res.status} ${res.statusText}`, res.status);
+    }
+
+    throw new Error(`GitHub API error: ${res.status} ${res.statusText}`);
+  }
+
+  const data = (await res.json()) as {
+    content?: string;
+    encoding?: string;
+    size?: number;
+    type?: string;
+  };
+
+  if (data.type !== "file") {
+    return { kind: "unavailable" };
+  }
+
+  if (typeof data.size === "number" && data.size > MAX_DIFF_RENDER_FILE_BYTES) {
+    return { kind: "oversized" };
+  }
+
+  if (!data.content || data.encoding !== "base64") {
+    return { kind: "unavailable" };
+  }
+
+  const bytes = Buffer.from(data.content.replace(/\n/g, ""), "base64");
+
+  if (bytes.length > MAX_DIFF_RENDER_FILE_BYTES) {
+    return { kind: "oversized" };
+  }
+
+  let suspiciousBytes = 0;
+  const sampleLength = Math.min(bytes.length, 8_000);
+
+  for (let index = 0; index < sampleLength; index += 1) {
+    const byte = bytes[index];
+
+    if (byte === 0) {
+      return { kind: "binary" };
+    }
+
+    if (byte === 9 || byte === 10 || byte === 13) {
+      continue;
+    }
+
+    if ((byte >= 1 && byte <= 8) || (byte >= 14 && byte <= 31) || byte === 127) {
+      suspiciousBytes += 1;
+    }
+  }
+
+  if (sampleLength > 0 && suspiciousBytes / sampleLength > 0.3) {
+    return { kind: "binary" };
+  }
+
+  return { kind: "text", content: bytes.toString("utf8") };
+}
+
 function extractRepoRef(item: Record<string, unknown>) {
   const repoUrl = item.repository_url as string;
   const parts = repoUrl.split("/");
@@ -149,6 +238,124 @@ function buildStableNumericId(value: string) {
   }
 
   return Math.abs(hash);
+}
+
+async function getViewerLogin(token: string) {
+  const viewer = (await githubFetch(token, "/user")) as Record<string, unknown>;
+  return ((viewer.login as string | undefined) ?? "").toLowerCase();
+}
+
+function getPendingReviewerNames(prDetail: Record<string, unknown>) {
+  const requestedReviewers =
+    (prDetail.requested_reviewers as Record<string, unknown>[] | undefined) ?? [];
+  const requestedTeams = (prDetail.requested_teams as Record<string, unknown>[] | undefined) ?? [];
+
+  return [
+    ...requestedReviewers
+      .map((reviewer) => reviewer.login as string | undefined)
+      .filter((name): name is string => Boolean(name)),
+    ...requestedTeams
+      .map((team) => team.name as string | undefined)
+      .filter((name): name is string => Boolean(name))
+      .map((name) => `@${name}`),
+  ];
+}
+
+function getReviewDecision({
+  hasApproval,
+  hasChangesRequested,
+  hasPendingReviewRequests,
+  reviewCount,
+}: {
+  hasApproval: boolean;
+  hasChangesRequested: boolean;
+  hasPendingReviewRequests: boolean;
+  reviewCount: number;
+}): NonNullable<PullRequest["reviewDecision"]> {
+  if (hasChangesRequested) return "changes_requested";
+  if (hasApproval) return "approved";
+  if (hasPendingReviewRequests) return "review_required";
+  if (reviewCount > 0) return "commented";
+  return "none";
+}
+
+async function getPullRequestCheckSummary(
+  token: string,
+  owner: string,
+  repo: string,
+  headSha: string | undefined
+): Promise<PullRequestCheckSummary> {
+  if (!headSha) {
+    return {
+      state: "unavailable",
+      totalCount: 0,
+      passingCount: 0,
+      failingCount: 0,
+      pendingCount: 0,
+    };
+  }
+
+  try {
+    const data = (await githubFetch(
+      token,
+      `/repos/${owner}/${repo}/commits/${headSha}/check-runs?per_page=100`
+    )) as { check_runs?: Record<string, unknown>[]; total_count?: number };
+    const checkRuns = data.check_runs ?? [];
+
+    if (checkRuns.length === 0) {
+      return {
+        state: "unavailable",
+        totalCount: data.total_count ?? 0,
+        passingCount: 0,
+        failingCount: 0,
+        pendingCount: 0,
+      };
+    }
+
+    const passingConclusions = new Set(["success", "neutral", "skipped"]);
+    const failingConclusions = new Set([
+      "action_required",
+      "cancelled",
+      "failure",
+      "startup_failure",
+      "timed_out",
+    ]);
+
+    let passingCount = 0;
+    let failingCount = 0;
+    let pendingCount = 0;
+
+    for (const checkRun of checkRuns) {
+      const status = String(checkRun.status ?? "");
+      const conclusion = String(checkRun.conclusion ?? "");
+
+      if (status !== "completed") {
+        pendingCount += 1;
+      } else if (passingConclusions.has(conclusion)) {
+        passingCount += 1;
+      } else if (failingConclusions.has(conclusion)) {
+        failingCount += 1;
+      } else {
+        pendingCount += 1;
+      }
+    }
+
+    return {
+      state: failingCount > 0 ? "failing" : pendingCount > 0 ? "pending" : "passing",
+      totalCount: checkRuns.length,
+      passingCount,
+      failingCount,
+      pendingCount,
+    };
+  } catch {
+    return {
+      state: "unavailable",
+      totalCount: 0,
+      passingCount: 0,
+      failingCount: 0,
+      pendingCount: 0,
+    };
+  }
 }
 
 function isMergeReadyState(mergeableState: string | null, isDraft: boolean) {
@@ -225,8 +432,7 @@ function getTriageClassification({
 
 // 1. 抓 triage 導向的 cross-repo PR queue
 export async function getPullRequests(token: string): Promise<PullRequest[]> {
-  const viewer = (await githubFetch(token, "/user")) as Record<string, unknown>;
-  const viewerLogin = ((viewer.login as string | undefined) ?? "").toLowerCase();
+  const viewerLogin = await getViewerLogin(token);
   const [authoredResult, reviewRequestedResult] = await Promise.allSettled([
     githubFetch(token, buildIssueSearchPath(`is:pr is:open archived:false author:${viewerLogin}`)),
     githubFetch(
@@ -312,6 +518,7 @@ export async function getPullRequests(token: string): Promise<PullRequest[]> {
         triageReason: triage.triageReason,
         isDraft,
         mergeableState,
+        htmlUrl: item.html_url as string,
       } satisfies PullRequest;
     })
   );
@@ -323,12 +530,98 @@ export async function getPullRequests(token: string): Promise<PullRequest[]> {
     .map((result) => result.value);
 }
 
+export async function getPullRequest(
+  token: string,
+  owner: string,
+  repo: string,
+  number: number
+): Promise<PullRequest> {
+  const viewerLogin = await getViewerLogin(token);
+  const [issue, prDetail, reviews] = await Promise.all([
+    githubFetch(token, `/repos/${owner}/${repo}/issues/${number}`),
+    githubFetch(token, `/repos/${owner}/${repo}/pulls/${number}`),
+    githubFetch(token, `/repos/${owner}/${repo}/pulls/${number}/reviews?per_page=100`),
+  ]);
+
+  const issueRecord = issue as Record<string, unknown>;
+  const prRecord = prDetail as Record<string, unknown>;
+  const author = ((prRecord.user as Record<string, unknown> | undefined)?.login ??
+    (issueRecord.user as Record<string, unknown> | undefined)?.login ??
+    "") as string;
+  const authorLogin = author.toLowerCase();
+  const latestReviews = getLatestReviewsByReviewer(
+    (reviews as Record<string, unknown>[] | undefined) ?? [],
+    author
+  );
+  const hasApproval = latestReviews.some((review) => review.state === "APPROVED");
+  const hasChangesRequested = latestReviews.some((review) => review.state === "CHANGES_REQUESTED");
+  const requestedReviewers =
+    (prRecord.requested_reviewers as Record<string, unknown>[] | undefined) ?? [];
+  const requestedTeams = (prRecord.requested_teams as Record<string, unknown>[] | undefined) ?? [];
+  const hasPendingReviewRequests = requestedReviewers.length > 0 || requestedTeams.length > 0;
+  const pendingReviewers = getPendingReviewerNames(prRecord);
+  const isDraft = Boolean(prRecord.draft);
+  const mergeableState = (prRecord.mergeable_state as string | null | undefined) ?? null;
+  const isMerged = Boolean(prRecord.merged);
+  const headSha = ((prRecord.head as Record<string, unknown> | undefined)?.sha as
+    | string
+    | undefined);
+  const checkSummary = await getPullRequestCheckSummary(token, owner, repo, headSha);
+  const status: PullRequest["status"] = isMerged
+    ? "merged"
+    : ((prRecord.state as string | undefined) ?? issueRecord.state) === "closed"
+      ? "closed"
+      : "open";
+  const triage = getTriageClassification({
+    isAuthor: authorLogin === viewerLogin,
+    isDraft,
+    mergeableState,
+    hasPendingReviewRequests,
+    hasApproval,
+    hasChangesRequested,
+  });
+
+  return {
+    id: issueRecord.id as number,
+    number,
+    title: ((prRecord.title as string | undefined) ?? issueRecord.title ?? "") as string,
+    repo,
+    owner,
+    status,
+    author,
+    createdAt: ((prRecord.created_at as string | undefined) ??
+      issueRecord.created_at ??
+      "") as string,
+    updatedAt: ((prRecord.updated_at as string | undefined) ??
+      issueRecord.updated_at ??
+      "") as string,
+    reviewCount: latestReviews.length,
+    commentCount:
+      ((issueRecord.comments as number | undefined) ?? 0) +
+      ((prRecord.review_comments as number | undefined) ?? 0) +
+      ((reviews as Record<string, unknown>[] | undefined)?.length ?? 0),
+    triageQueue: triage.triageQueue,
+    triageReason: triage.triageReason,
+    isDraft,
+    mergeableState,
+    htmlUrl: ((prRecord.html_url as string | undefined) ?? issueRecord.html_url ?? "") as string,
+    reviewDecision: getReviewDecision({
+      hasApproval,
+      hasChangesRequested,
+      hasPendingReviewRequests,
+      reviewCount: latestReviews.length,
+    }),
+    pendingReviewers,
+    checkSummary,
+  };
+}
+
 export async function getPullRequestLinkedIssues(
   token: string,
   owner: string,
   repo: string,
   number: number
-): Promise<PullRequestLinkedIssue[]> {
+): Promise<PullRequestLinkedIssuesResult> {
   try {
     const data = await githubGraphQLFetch<{
       repository?: {
@@ -435,33 +728,103 @@ export async function getPullRequestLinkedIssues(
           return new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime();
         }) ?? [];
 
-    return issues;
+    return { issues, error: null };
   } catch {
-    return [];
+    return { issues: [], error: "無法載入相關 issue，請稍後再試。" };
   }
 }
 
 // 2. 抓某個 PR 的所有異動檔案
-// 回傳每個檔案的 patch（就是 diff 內容），給 DiffViewer 顯示
+// 回傳每個檔案的 patch 與完整舊版 / 新版內容，給 DiffViewer 顯示與展開 folded 區塊
 export async function getPullRequestFiles(
   token: string,
   owner: string,
   repo: string,
   number: number
 ): Promise<PullRequestFile[]> {
-  const data = await githubFetch(token, `/repos/${owner}/${repo}/pulls/${number}/files`);
-  return data.map((file: Record<string, unknown>) => ({
-    filename: file.filename as string,
-    status: file.status as PullRequestFile["status"],
-    additions: file.additions as number,
-    deletions: file.deletions as number,
-    patch: (file.patch as string) ?? "",
-  }));
+  const [pullRequest, data] = await Promise.all([
+    githubFetch(token, `/repos/${owner}/${repo}/pulls/${number}`),
+    githubFetch(token, `/repos/${owner}/${repo}/pulls/${number}/files?per_page=100`),
+  ]);
+
+  const baseRef = (
+    (pullRequest as Record<string, unknown>).base as Record<string, unknown> | undefined
+  )?.sha as string | undefined;
+  const headRef = (
+    (pullRequest as Record<string, unknown>).head as Record<string, unknown> | undefined
+  )?.sha as string | undefined;
+
+  const files = (data as Record<string, unknown>[]).map(async (file) => {
+    const filename = file.filename as string;
+    const status = file.status as PullRequestFile["status"];
+    const previousFilename = file.previous_filename as string | undefined;
+    const patch = (file.patch as string) ?? "";
+
+    let oldCode: string | null = null;
+    let newCode: string | null = null;
+    let oldResult:
+      | { kind: "text"; content: string }
+      | { kind: "missing" }
+      | { kind: "binary" }
+      | { kind: "oversized" }
+      | { kind: "unavailable" } = { kind: "missing" };
+    let newResult:
+      | { kind: "text"; content: string }
+      | { kind: "missing" }
+      | { kind: "binary" }
+      | { kind: "oversized" }
+      | { kind: "unavailable" } = { kind: "missing" };
+
+    if (baseRef && status !== "added") {
+      oldResult = await getRepositoryFileContent(
+        token,
+        owner,
+        repo,
+        previousFilename ?? filename,
+        baseRef
+      );
+      oldCode = oldResult.kind === "text" ? oldResult.content : null;
+    }
+
+    if (headRef && status !== "removed") {
+      newResult = await getRepositoryFileContent(token, owner, repo, filename, headRef);
+      newCode = newResult.kind === "text" ? newResult.content : null;
+    }
+
+    const canRenderFullOld = status === "added" || oldResult.kind === "text";
+    const canRenderFullNew = status === "removed" || newResult.kind === "text";
+
+    let contentMode: PullRequestFile["contentMode"] = "unavailable";
+
+    if (canRenderFullOld && canRenderFullNew) {
+      contentMode = "full";
+    } else if (patch) {
+      contentMode = "patch";
+    } else if (oldResult.kind === "binary" || newResult.kind === "binary") {
+      contentMode = "binary";
+    } else if (oldResult.kind === "oversized" || newResult.kind === "oversized") {
+      contentMode = "oversized";
+    }
+
+    return {
+      filename,
+      previousFilename: previousFilename ?? null,
+      status,
+      additions: file.additions as number,
+      deletions: file.deletions as number,
+      patch,
+      oldCode,
+      newCode,
+      contentMode,
+    } satisfies PullRequestFile;
+  });
+
+  return Promise.all(files);
 }
 
-// 3. 對某個 PR 發表評論
-// 用 POST 打 GitHub Issues Comments API
-// PR 在 GitHub 內部就是一種 Issue，所以用 issues endpoint
+/*
+Future writable helper if comments are enabled again:
+
 export async function postComment(
   token: string,
   owner: string,
@@ -481,3 +844,4 @@ export async function postComment(
   });
   if (!res.ok) throw new Error(`Failed to post comment: ${res.status}`);
 }
+*/

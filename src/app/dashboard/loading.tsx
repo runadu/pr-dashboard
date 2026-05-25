@@ -1,6 +1,6 @@
 export default function PullRequestLoading() {
   return (
-    <div className="min-h-screen bg-background px-4 py-6 text-foreground sm:px-6 sm:py-8">
+    <div className="min-h-screen bg-background text-foreground">
       <div className="mx-auto overflow-hidden border border-border/50 bg-surface/90 divide-y divide-border/60">
         <header className="flex flex-col gap-4 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <div>
@@ -142,85 +142,6 @@ export default function PullRequestLoading() {
                 </div>
               </div>
             </div>
-
-            <div className="overflow-hidden rounded-md border border-border/60 bg-surface/45">
-              <div className="flex flex-col gap-3 border-b border-border/60 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <div className="h-5 w-28 animate-pulse rounded-md bg-surface-strong/70" />
-                  <div className="mt-2 h-3 w-48 animate-pulse rounded-md bg-accent-soft" />
-                </div>
-
-                <div className="h-4 w-16 animate-pulse rounded-md bg-surface-strong/50" />
-              </div>
-
-              <div className="space-y-4 p-4">
-                {Array.from({ length: 2 }).map((_, fileIndex) => (
-                  <div
-                    key={fileIndex}
-                    className="overflow-hidden rounded-md border border-border/60 bg-background/20"
-                  >
-                    <div className="flex items-center justify-between border-b border-border/60 px-4 py-3">
-                      <div className="flex min-w-0 items-center gap-3">
-                        <div className="h-5 w-10 animate-pulse rounded-full bg-accent-soft" />
-                        <div className="h-4 w-72 max-w-[60vw] animate-pulse rounded-md bg-surface-strong/70" />
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <div className="h-5 w-10 animate-pulse rounded-full bg-accent-soft" />
-                        <div className="h-5 w-6 animate-pulse rounded-full bg-surface-strong/50" />
-                      </div>
-                    </div>
-
-                    <div className="bg-background/40">
-                      {Array.from({ length: fileIndex === 0 ? 28 : 14 }).map((_, lineIndex) => {
-                        const isRemoved = lineIndex === 6 || lineIndex === 18;
-                        const isAdded = !isRemoved && lineIndex % 4 !== 0;
-
-                        return (
-                          <div
-                            key={lineIndex}
-                            className={[
-                              "grid grid-cols-[3rem_1fr] border-b border-border/30 text-xs",
-                              isRemoved
-                                ? "bg-red-500/10"
-                                : isAdded
-                                  ? "bg-emerald-500/10"
-                                  : "bg-background/40",
-                            ].join(" ")}
-                          >
-                            <div className="border-r border-border/40 px-2 py-1.5 text-right">
-                              <div className="ml-auto h-3 w-5 animate-pulse rounded-sm bg-surface-strong/40" />
-                            </div>
-
-                            <div className="px-3 py-1.5">
-                              <div
-                                className={[
-                                  "h-3 animate-pulse rounded-sm",
-                                  lineIndex % 5 === 0
-                                    ? "w-5/12"
-                                    : lineIndex % 3 === 0
-                                      ? "w-9/12"
-                                      : "w-7/12",
-                                  isRemoved
-                                    ? "bg-red-500/20"
-                                    : isAdded
-                                      ? "bg-emerald-500/20"
-                                      : "bg-surface-strong/40",
-                                ].join(" ")}
-                              />
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <p className="mt-4 text-sm text-muted-foreground">
-              正在載入 Pull Request 詳細資料與檔案差異。
-            </p>
           </section>
         </main>
       </div>

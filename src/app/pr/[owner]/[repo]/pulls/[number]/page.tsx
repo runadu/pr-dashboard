@@ -1,13 +1,13 @@
 import Link from "next/link";
-import { ArrowLeft, FolderGit2, GitPullRequest, UserRound } from "lucide-react";
-import { notFound, redirect } from "next/navigation";
+import { ArrowLeft, CalendarDays, FolderGit2, UserRound, ExternalLink } from "lucide-react";
+import { redirect } from "next/navigation";
 import { CommentBox } from "@/components/comment/comment-box";
 import { DiffViewer } from "@/components/diff/diff-viewer";
 import { Header } from "@/components/layout/header";
 import { MainLayout } from "@/components/layout/main-layout";
 import { LinkedIssuesPanel } from "@/components/pr/linked-issues-panel";
-import { StatusBadge } from "@/components/pr/badge";
-import { getPullRequestFiles, getPullRequestLinkedIssues, getPullRequests } from "@/lib/github";
+import { StatusBadge, TriageBadge } from "@/components/pr/badge";
+import { getPullRequest, getPullRequestFiles, getPullRequestLinkedIssues } from "@/lib/github";
 import { buildSessionRequiredSignInPath, redirectOnGitHubAuthError } from "@/lib/github-session";
 import { getServerAuth } from "@/lib/server-auth";
 
@@ -28,13 +28,13 @@ export default async function PrDetailPage({ params }: PrDetailPageProps) {
     redirect(buildSessionRequiredSignInPath(callbackUrl));
   }
 
-  let prs;
+  let pullRequest;
   let files;
-  let linkedIssues;
+  let linkedIssuesResult;
 
   try {
-    [prs, files, linkedIssues] = await Promise.all([
-      getPullRequests(accessToken),
+    [pullRequest, files, linkedIssuesResult] = await Promise.all([
+      getPullRequest(accessToken, owner, repo, Number(number)),
       getPullRequestFiles(accessToken, owner, repo, Number(number)),
       getPullRequestLinkedIssues(accessToken, owner, repo, Number(number)),
     ]);
@@ -48,35 +48,32 @@ export default async function PrDetailPage({ params }: PrDetailPageProps) {
     email: session.user?.email ?? "",
     avatarUrl: session.user?.image ?? "",
   };
-
-  const pullRequest = prs.find(
-    (item) => item.owner === owner && item.repo === repo && item.number === Number(number)
-  );
-
-  if (!pullRequest) {
-    notFound();
-  }
+  const createdAtText = new Intl.DateTimeFormat("zh-TW", {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(pullRequest.createdAt));
 
   return (
-    <div className="min-h-screen bg-background px-4 py-6 text-foreground sm:px-6 sm:py-8">
+    <div className="min-h-screen bg-background text-foreground">
       <div className="mx-auto overflow-hidden border border-border bg-surface divide-y divide-border">
         <Header user={user} />
 
         <MainLayout sessionExpiresAt={session.expires}>
+          <div className="mb-4 lg:mb-6">
+            <Link
+              className="inline-flex items-center gap-2 text-sm font-medium text-accent transition-colors hover:text-accent-hover"
+              href="/dashboard"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              <span>回到儀表板</span>
+            </Link>
+          </div>
           <div className="flex flex-col gap-5">
-            <section className="rounded-2xl border border-border bg-surface px-4 py-5 sm:px-6 sm:py-6">
+            <section className="rounded-2xl border border-border bg-card px-4 py-5 sm:px-6 sm:py-6">
               <div className="flex flex-col gap-5">
-                <div className="flex items-center justify-between gap-3">
-                  <Link
-                    className="inline-flex items-center gap-2 text-sm font-medium text-accent transition-colors hover:text-accent-hover"
-                    href="/dashboard"
-                  >
-                    <ArrowLeft className="h-4 w-4" />
-                    <span>回到儀表板</span>
-                  </Link>
-                </div>
-
-                <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+                <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="inline-flex max-w-full items-center gap-2 rounded-full border border-border bg-background px-3 py-1 text-xs font-medium text-muted">
@@ -87,19 +84,23 @@ export default async function PrDetailPage({ params }: PrDetailPageProps) {
                       </span>
 
                       <span className="inline-flex items-center rounded-full bg-accent-soft px-2.5 py-1 text-xs font-semibold text-accent">
-                        PR #{pullRequest.number}
+                        #{pullRequest.number}
                       </span>
                     </div>
 
-                    <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-                      <h1 className="min-w-0 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+                    <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+                      <h1 className="min-w-0 text-lg font-semibold tracking-tight text-foreground sm:text-xl">
                         {pullRequest.title}
                       </h1>
 
                       <div className="shrink-0">
-                        <StatusBadge status={pullRequest.status} />
+                        <TriageBadge queue={pullRequest.triageQueue} />
                       </div>
                     </div>
+
+                    <p className="mt-3 line-clamp-2 text-sm leading-6 text-muted">
+                      {pullRequest.triageReason}
+                    </p>
 
                     <div className="mt-4 flex flex-wrap gap-2 text-sm text-muted">
                       <span className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1.5">
@@ -108,44 +109,66 @@ export default async function PrDetailPage({ params }: PrDetailPageProps) {
                       </span>
 
                       <span className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1.5">
-                        <GitPullRequest className="h-4 w-4 shrink-0 text-accent" />
-                        <span className="truncate">
-                          {pullRequest.owner}/{pullRequest.repo} #{pullRequest.number}
-                        </span>
+                        <CalendarDays className="h-4 w-4 shrink-0 text-accent" />
+                        <span>{createdAtText}</span>
                       </span>
+
+                      <StatusBadge status={pullRequest.status} />
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2 sm:w-fit xl:min-w-[260px]">
-                    <div className="rounded-2xl border border-border bg-background px-4 py-3">
-                      <p className="text-xs font-medium text-muted">Files changed</p>
-                      <p className="mt-1 text-xl font-semibold tracking-tight text-foreground">
-                        {files.length}
-                      </p>
+                  <div className="flex shrink-0 flex-col gap-3 lg:w-55 lg:items-end">
+                    <div className="grid grid-cols-2 gap-2 self-stretch">
+                      <div className="rounded-2xl border border-border bg-background px-3 py-3">
+                        <p className="text-xs font-medium text-muted">Reviews</p>
+                        <p className="mt-1 text-lg font-semibold tracking-tight text-foreground">
+                          {pullRequest.reviewCount}
+                        </p>
+                      </div>
+
+                      <div className="rounded-2xl border border-border bg-background px-3 py-3">
+                        <p className="text-xs font-medium text-muted">Comments</p>
+                        <p className="mt-1 text-lg font-semibold tracking-tight text-foreground">
+                          {pullRequest.commentCount}
+                        </p>
+                      </div>
                     </div>
 
-                    <div className="rounded-2xl border border-border bg-background px-4 py-3">
-                      <p className="text-xs font-medium text-muted">Comments</p>
-                      <p className="mt-1 text-xl font-semibold tracking-tight text-foreground">
-                        {pullRequest.commentCount}
-                      </p>
-                    </div>
+                    <Link
+                      href={pullRequest.htmlUrl}
+                      rel="noreferrer"
+                      target="_blank"
+                      className="inline-flex w-full items-center justify-between rounded-xl border border-border bg-background px-3 py-2.5 text-sm font-medium text-foreground transition-colors hover:border-accent/30 hover:bg-accent-soft hover:text-accent lg:w-auto lg:min-w-55"
+                    >
+                      <div className="inline-flex items-center gap-2">
+                        <span>在 GitHub 開啟</span>
+                      </div>
+                      <ExternalLink className="h-4 w-4" />
+                    </Link>
                   </div>
                 </div>
               </div>
             </section>
 
             <section className="grid gap-5">
-              <CommentBox
-                eyebrow="Review thread"
-                title="留言與回覆"
-                placeholder="留下 review 意見、blocking issue 或 follow-up 建議..."
-                submitLabel="送出留言"
-                currentUserName={user.name}
-                currentUserAvatarUrl={user.avatarUrl}
-              />
+              <div className="grid gap-5 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)] xl:items-start">
+                <CommentBox
+                  eyebrow="Review thread"
+                  title="留言與回覆"
+                  // Writable version previously also passed:
+                  // placeholder="留下 review 意見、blocking issue 或 follow-up 建議..."
+                  // submitLabel="送出留言"
+                  // currentUserName={user.name}
+                  // currentUserAvatarUrl={user.avatarUrl}
+                />
 
-              <LinkedIssuesPanel issues={linkedIssues} />
+                <div className="xl:sticky xl:top-5">
+                  <LinkedIssuesPanel
+                    errorMessage={linkedIssuesResult.error}
+                    issues={linkedIssuesResult.issues}
+                  />
+                </div>
+              </div>
 
               <DiffViewer files={files} />
             </section>

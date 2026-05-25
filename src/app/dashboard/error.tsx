@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Home, LogIn, RotateCcw } from "lucide-react";
+import { LogIn, RotateCcw } from "lucide-react";
 import { useEffect } from "react";
 
 type DashboardErrorProps = {

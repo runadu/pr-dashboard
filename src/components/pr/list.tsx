@@ -24,7 +24,7 @@ export function List({ initialPRs }: ListProps) {
 
   if (filteredPRs.length === 0) {
     return (
-      <section className="rounded-2xl border border-dashed border-borders px-4 py-6 sm:px-6 sm:py-8">
+      <section className="rounded-2xl border border-dashed border-borders">
         <div>
           <div className="mx-auto flex max-w-md flex-col items-center">
             <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-accent-soft text-accent">
