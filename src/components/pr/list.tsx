@@ -26,7 +26,7 @@ export function List({ initialPRs }: ListProps) {
     return (
       <section className="rounded-2xl border border-dashed border-borders">
         <div>
-          <div className="mx-auto flex max-w-md flex-col items-center">
+          <div className="mx-auto flex max-w-md flex-col items-center p-4 lg:p-6">
             <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-accent-soft text-accent">
               <Inbox className="h-6 w-6" />
             </span>

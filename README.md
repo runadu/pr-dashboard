@@ -17,6 +17,7 @@ PR Dashboard 是一個 GitHub review workspace，目標是把跨 repository 的 
 - React 19
 - TypeScript
 - Tailwind CSS 4
+- Vitest
 - NextAuth
 - Redux Toolkit
 
@@ -105,6 +106,24 @@ npm run test:diff
 npm run build
 npm run start
 ```
+
+`npm run test` 會執行 Vitest 掃描到的所有 `src/**/*.test.ts`。
+若你只想做一次性驗證而不進入 watch / interactive 模式，可以使用：
+
+```bash
+npm run test -- --run
+```
+
+`npm run test:diff` 目前是針對 diff 邏輯的定向測試。
+
+## Testing
+
+- 專案使用 Vitest 進行單元測試
+- 執行完整測試：`npm run test -- --run`
+- 目前測試主要覆蓋 diff 呈現相關的純邏輯
+- GitHub API、登入流程與頁面層級互動目前尚未有完整整合測試
+
+若未來新增依賴環境變數的測試，建議使用 `.env.test`，不要直接依賴本機的 `.env.local`。
 
 ## Main Routes
 

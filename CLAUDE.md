@@ -14,6 +14,7 @@ This project is a GitHub PR triage workspace built with:
 - React 19
 - TypeScript
 - Tailwind CSS 4
+- Vitest
 - NextAuth with GitHub App user authorization
 - Redux Toolkit
 - `lucide-react`
@@ -35,6 +36,11 @@ Expected env vars:
 - `NEXTAUTH_URL`
 
 Without a valid GitHub session, protected pages redirect to `/signin?callbackUrl=...`.
+
+Testing note:
+
+- Next.js test environment does not load `.env.local` when `NODE_ENV=test`
+- if future Vitest coverage needs env-backed setup, prefer `.env.test` or explicit `@next/env` loading in test bootstrap
 
 ## Auth And Session Model
 
@@ -76,6 +82,8 @@ Implications:
 - `npm run build`
 
 `npm run lint` is the minimum validation step after code changes.
+`npm run test` uses Vitest and picks up `src/**/*.test.ts`.
+Use `npm run test -- --run` for a one-shot local verification pass.
 
 ## Current Architecture
 
@@ -143,6 +151,13 @@ Implications:
   - small date/time formatting helpers
   - currently not part of the main dashboard flow
 
+### Tooling
+
+- `vitest.config.mts`
+  - Vitest config
+  - `environment: "node"`
+  - includes `src/**/*.test.ts`
+
 ### State Management
 
 - `src/store/index.ts`
@@ -182,6 +197,11 @@ Prefer server-side data fetching first. Use Redux for client-side interaction af
   - light/dark mode toggle
 - `src/components/notifications-menu.tsx`
   - queue-oriented notification entry points
+
+### Testing
+
+- current automated test coverage is intentionally narrow and focused on pure diff logic
+- do not claim auth, routing, or GitHub integration are already covered unless new tests are added
 
 ## Triage Model
 
@@ -275,7 +295,8 @@ Keep client boundaries small, but not so fragmented that they become thin wrappe
 After meaningful changes, prefer:
 
 1. `npm run lint`
-2. `npm run test:diff`
-3. `npm run build`
+2. `npm run test -- --run`
+3. `npm run test:diff` when working specifically on diff rendering behavior
+4. `npm run build`
 
 If `next build` fails inside sandbox because Turbopack needs capabilities the sandbox blocks, rerun it outside the sandbox rather than assuming the project is broken.

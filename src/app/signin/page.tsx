@@ -81,7 +81,7 @@ export default async function SignInPage({ searchParams }: SignInPageProps) {
 
   return (
     <main className="min-h-dvh bg-background text-foreground">
-      <div className="mx-auto flex min-h-[calc(100dvh-3rem)] w-full flex-col overflow-hidden border border-border bg-surface sm:min-h-[calc(100dvh-4rem)]">
+      <div className="mx-auto flex min-h-[calc(100dvh-3rem)] w-full flex-col overflow-hidden sm:min-h-[calc(100dvh-4rem)]">
         <Header variant="minimal" />
 
         <section className="flex flex-1 border-t border-border">
