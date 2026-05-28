@@ -2,9 +2,9 @@ import { redirect } from "next/navigation";
 import { getServerAuth } from "@/lib/server-auth";
 
 export default async function HomePage() {
-  const { accessToken } = await getServerAuth();
+  const { accessToken, githubLogin } = await getServerAuth();
 
-  if (!accessToken) {
+  if (!accessToken || !githubLogin) {
     redirect("/signin");
   }
 

@@ -21,10 +21,10 @@ type PrDetailPageProps = {
 
 export default async function PrDetailPage({ params }: PrDetailPageProps) {
   const { owner, repo, number } = await params;
-  const { session, accessToken } = await getServerAuth();
+  const { session, accessToken, githubLogin } = await getServerAuth();
   const callbackUrl = `/pr/${owner}/${repo}/pulls/${number}`;
 
-  if (!session || !accessToken) {
+  if (!session || !accessToken || !githubLogin) {
     redirect(buildSessionRequiredSignInPath(callbackUrl));
   }
 
@@ -34,7 +34,7 @@ export default async function PrDetailPage({ params }: PrDetailPageProps) {
 
   try {
     [pullRequest, files, linkedIssuesResult] = await Promise.all([
-      getPullRequest(accessToken, owner, repo, Number(number)),
+      getPullRequest(accessToken, owner, repo, Number(number), githubLogin),
       getPullRequestFiles(accessToken, owner, repo, Number(number)),
       getPullRequestLinkedIssues(accessToken, owner, repo, Number(number)),
     ]);

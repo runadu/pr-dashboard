@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAppVisibleTarget } from "@/lib/github-visibility";
-import { getRouteAccessToken } from "@/lib/server-auth";
+import { getRouteAuth } from "@/lib/server-auth";
 
 const GITHUB_API = "https://api.github.com";
 
@@ -65,9 +65,9 @@ function mapGitHubComment(
 }
 
 export async function GET(req: NextRequest) {
-  const accessToken = await getRouteAccessToken(req);
+  const { accessToken, githubLogin } = await getRouteAuth(req);
 
-  if (!accessToken) {
+  if (!accessToken || !githubLogin) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -80,7 +80,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
   }
 
-  const isVisible = await isAppVisibleTarget(accessToken, {
+  const isVisible = await isAppVisibleTarget(accessToken, githubLogin, {
     owner,
     repo,
     number: Number(number),
@@ -130,7 +130,7 @@ export async function POST(req: NextRequest) {
   /*
   Writable version kept for future restoration:
 
-  const accessToken = await getRouteAccessToken(req);
+  const { accessToken } = await getRouteAuth(req);
 
   if (!accessToken) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
