@@ -10,16 +10,16 @@ import { getServerAuth } from "@/lib/server-auth";
 import { getPullRequestQueueCounts } from "@/lib/triage";
 
 export default async function DashboardPage() {
-  const { session, accessToken } = await getServerAuth();
+  const { session, accessToken, githubLogin } = await getServerAuth();
 
-  if (!session || !accessToken) {
+  if (!session || !accessToken || !githubLogin) {
     redirect(buildSessionRequiredSignInPath("/dashboard"));
   }
 
   let prs;
 
   try {
-    prs = await getPullRequests(accessToken);
+    prs = await getPullRequests(accessToken, githubLogin);
   } catch (error) {
     redirectOnGitHubAuthError(error, "/dashboard");
     throw error;

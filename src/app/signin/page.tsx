@@ -68,14 +68,14 @@ const signInNotes = [
 ] as const;
 
 export default async function SignInPage({ searchParams }: SignInPageProps) {
-  const { session, accessToken } = await getServerAuth();
+  const { session, accessToken, githubLogin } = await getServerAuth();
   const query = await searchParams;
   const callbackUrl = normalizeCallbackUrl(query.callbackUrl);
   const errorMessage = getErrorMessage(query.error);
   const forceLogin =
     (Array.isArray(query.forceLogin) ? query.forceLogin[0] : query.forceLogin) === "1";
 
-  if (session && accessToken && !forceLogin && !errorMessage) {
+  if (session && accessToken && githubLogin && !forceLogin && !errorMessage) {
     redirect(callbackUrl);
   }
 

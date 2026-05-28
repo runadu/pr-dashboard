@@ -10,8 +10,12 @@ function toTargetKey({ owner, repo, number }: GitHubTargetRef) {
   return `${owner}/${repo}#${number}`;
 }
 
-export async function isAppVisibleTarget(token: string, target: GitHubTargetRef): Promise<boolean> {
-  const pullRequests = await getPullRequests(token);
+export async function isAppVisibleTarget(
+  token: string,
+  viewerLogin: string,
+  target: GitHubTargetRef
+): Promise<boolean> {
+  const pullRequests = await getPullRequests(token, viewerLogin);
 
   if (
     pullRequests.some(

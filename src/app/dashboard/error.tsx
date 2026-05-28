@@ -7,9 +7,10 @@ import { useEffect } from "react";
 type DashboardErrorProps = {
   error: Error & { digest?: string };
   reset: () => void;
+  unstable_retry: () => void;
 };
 
-export default function DashboardError({ error, reset }: DashboardErrorProps) {
+export default function DashboardError({ error, unstable_retry }: DashboardErrorProps) {
   useEffect(() => {
     console.error("Dashboard error:", {
       message: error.message,
@@ -41,7 +42,7 @@ export default function DashboardError({ error, reset }: DashboardErrorProps) {
           <div className="mt-6 flex flex-col gap-3 sm:flex-row">
             <button
               type="button"
-              onClick={reset}
+              onClick={unstable_retry}
               className="inline-flex items-center justify-center gap-2 rounded-md bg-accent px-4 py-2.5 text-sm font-medium text-accent-foreground shadow-sm transition hover:bg-accent-hover focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background"
             >
               <RotateCcw className="size-4" aria-hidden="true" />

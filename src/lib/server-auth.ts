@@ -7,15 +7,21 @@ import { authOptions } from "@/lib/auth";
 
 type TokenPayload = {
   accessToken?: unknown;
+  githubLogin?: unknown;
 } | null;
 
 type ServerAuthResult = {
   session: Session | null;
   accessToken: string | null;
+  githubLogin: string | null;
 };
 
 function extractAccessToken(token: TokenPayload) {
   return typeof token?.accessToken === "string" ? token.accessToken : null;
+}
+
+function extractGitHubLogin(token: TokenPayload) {
+  return typeof token?.githubLogin === "string" ? token.githubLogin : null;
 }
 
 async function getServerToken() {
@@ -35,9 +41,15 @@ export async function getServerAuth(): Promise<ServerAuthResult> {
   return {
     session,
     accessToken: extractAccessToken(token),
+    githubLogin: extractGitHubLogin(token),
   };
 }
 
-export async function getRouteAccessToken(req: NextRequest) {
-  return extractAccessToken(await getToken({ req }));
+export async function getRouteAuth(req: NextRequest) {
+  const token = await getToken({ req });
+
+  return {
+    accessToken: extractAccessToken(token),
+    githubLogin: extractGitHubLogin(token),
+  };
 }

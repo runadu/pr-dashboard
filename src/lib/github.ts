@@ -240,11 +240,6 @@ function buildStableNumericId(value: string) {
   return Math.abs(hash);
 }
 
-async function getViewerLogin(token: string) {
-  const viewer = (await githubFetch(token, "/user")) as Record<string, unknown>;
-  return ((viewer.login as string | undefined) ?? "").toLowerCase();
-}
-
 function getPendingReviewerNames(prDetail: Record<string, unknown>) {
   const requestedReviewers =
     (prDetail.requested_reviewers as Record<string, unknown>[] | undefined) ?? [];
@@ -431,8 +426,7 @@ function getTriageClassification({
 }
 
 // 1. 抓 triage 導向的 cross-repo PR queue
-export async function getPullRequests(token: string): Promise<PullRequest[]> {
-  const viewerLogin = await getViewerLogin(token);
+export async function getPullRequests(token: string, viewerLogin: string): Promise<PullRequest[]> {
   const [authoredResult, reviewRequestedResult] = await Promise.allSettled([
     githubFetch(token, buildIssueSearchPath(`is:pr is:open archived:false author:${viewerLogin}`)),
     githubFetch(
@@ -534,9 +528,9 @@ export async function getPullRequest(
   token: string,
   owner: string,
   repo: string,
-  number: number
+  number: number,
+  viewerLogin: string
 ): Promise<PullRequest> {
-  const viewerLogin = await getViewerLogin(token);
   const [issue, prDetail, reviews] = await Promise.all([
     githubFetch(token, `/repos/${owner}/${repo}/issues/${number}`),
     githubFetch(token, `/repos/${owner}/${repo}/pulls/${number}`),
